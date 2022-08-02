@@ -36,11 +36,11 @@ pub fn prepare(
 
         // let is_metadata = idx < 1024 * 1024 || idx + n_read as u64 + 1024 * 1024 >= start_of_eocr;
         let is_metadata = idx + n_read as u64 >= start_of_eocr;
-        cursor.set_storage_preference(if is_metadata {
+        /*cursor.set_storage_preference(if is_metadata {
             StoragePreference::FASTEST
         } else {
             StoragePreference::FAST
-        });
+        });*/
 
         cursor.write_all(&buf[..n_read])?;
         idx += n_read as u64;
@@ -86,6 +86,8 @@ pub fn read(
 
                     for _ in 0..files_per_run {
                         let file_name = &file_names.choose(&mut rng).expect("Empty file name list");
+
+                        println!("\n...................................{}", file_name);
 
                         let mut file = archive
                             .by_name(file_name)
