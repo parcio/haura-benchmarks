@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2030,SC2031 # we exploit this characteristic to start several test scenarios - merging them would lead to pollution
 
+function ensure_prepared {
+  local url
+  url="https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.58.tar.xz"
+
+  if [ ! -e "$PWD/data/linux.zip" ]
+  then
+    mkdir data
+    pushd data || exit
+
+    curl "$url" -o linux.tar.xz
+    tar xf linux.tar.xz
+    rm linux.tar.xz
+    zip -0 -r linux.zip linux-*
+    rm -r linux-*
+
+    popd || exit
+  fi
+}
+
 function run {
   local vdev_type="$1"
   local name="$2"
@@ -76,8 +95,11 @@ function tiered() {
 }
 
 function zip_cache() {
-  local F="$PWD/data/linux-5.12.13.zip"
+  local F="$PWD/data/linux.zip"
   local F_CD_START=1040032667
+
+  ensure_prepared
+
   for cache_mib in 32 64 128 256 512 1024 2048 4096 8192; do
     (
       export BETREE__CACHE_SIZE=$((cache_mib * 1024 * 1024))
@@ -87,8 +109,11 @@ function zip_cache() {
 }
 
 function zip_mt() {
-  local F="$PWD/data/linux-5.12.13.zip"
+  local F="$PWD/data/linux.zip"
   local F_CD_START=1040032667
+
+  ensure_prepared
+
   for cache_mib in 256 512 1024 2048; do
     echo "using $cache_mib MiB of cache"
     (
@@ -108,8 +133,9 @@ function zip_mt() {
 }
 
 function zip_tiered() {
-  local F="$PWD/data/linux-5.12.13.zip"
+  local F="$PWD/data/linux.zip"
   local F_CD_START=1 #242415017 #1040032667
+  ensure_prepared
   # for cache_mib in 256 512 1024; do
   for cache_mib in 32 64; do
     echo "using $cache_mib MiB of cache"
@@ -159,8 +185,10 @@ function zip_tiered() {
 
 
 function ingest() {
-  local F="$PWD/data/linux-5.12.13.zip"
+  local F="$PWD/data/linux.zip"
   local DISK=/dev/disk/by-id/ata-WDC_WD30EFRX-68EUZN0_WD-WMC4N2195306
+
+  ensure_prepared
 
   (
     export BETREE__STORAGE__TIERS="[ [ { file = \"$DISK\" } ] ]"
@@ -187,8 +215,8 @@ function switchover() {
   run "default" switchover_large switchover 4 "$((8 * 1024 * 1024 * 1024))"
 }
 
-#zip_tiered
-tiered
+zip_tiered
+#tiered
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
   #export RUST_LOG=info
