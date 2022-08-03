@@ -23,10 +23,10 @@ def subtract_first_index(array):
 data = []
 
 if len(sys.argv) < 2:
-    print("Please specify an input json file. If you already completed benchmarks they can be found under `results/*`.")
+    print("Please specify an input run directory. If you already completed benchmarks they can be found under `results/*`.")
     exit(1)
 
-fs = open(sys.argv[1], 'r')
+fs = open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r')
 line_number = 0
   
 while True:
@@ -82,4 +82,4 @@ plt.ylabel("MB (I/0)")  # add Y-axis label
 plt.title("HAURA")  # add title
 #plt.xticks(epoch, rotation = 90)
 plt.show()
-#plt.savefig('pmem.png')
+plt.savefig(f"{sys.argv[1]}/plot.png")
