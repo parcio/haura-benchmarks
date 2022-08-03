@@ -41,11 +41,11 @@ function run {
   echo "running $mode with these settings:"
   env | grep BETREE__
   env > "env"
-  ./target/release/bectl config print-active > "config"
-  ./target/release/betree-perf "$mode" "$@"
+  bectl config print-active > "config"
+  "$ROOT/target/release/betree-perf" "$mode" "$@"
 
   echo "merging results into $out_path/out.jsonl"
-  ./target/release/json-merge \
+  "$ROOT/target/release/json-merge" \
     --timestamp-key epoch_ms \
     ./betree-metrics.jsonl \
     ./proc.jsonl \
@@ -61,6 +61,7 @@ cargo build --release
 
 export RUST_LOG=warn
 export BETREE_CONFIG="$PWD/perf-config.json"
+export ROOT="$PWD"
 
 function tiered() {
   #export PMEM_NO_CLWB=1
