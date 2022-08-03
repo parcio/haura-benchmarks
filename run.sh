@@ -50,7 +50,7 @@ function run {
     ./betree-metrics.jsonl \
     ./proc.jsonl \
     ./sysinfo.jsonl \
-    | ./target/release/json-flatten > "out.jsonl"
+    | "$ROOT/target/release/json-flatten" > "out.jsonl"
 
   popd || return
 
