@@ -66,13 +66,10 @@ export ROOT="$PWD"
 function tiered() {
   #export PMEM_NO_CLWB=1
   #export BETREE__CACHE_SIZE=$((1 * 1024 * 1024 * 1024))
-  #export BETREE__STORAGE__TIERS="[ [ \"/vol1/datafile1\" ], [ \"/vol2/datafile1\" ] ]"
-  #export BETREE__STORAGE__TIERS="[ [ \"/vol2/datafile1\" ], [ \"/vol1/datafile1\" ] ]"
-  #export BETREE__STORAGE__TIERS="[ [ { path = \"/vol1/datafile1\", direct = false } ], [ { path = \"/vol2/datafile1\", direct = false } ] ]"
-  #export BETREE__STORAGE__TIERS="[ [ \"/mnt/pmemfs0/datafile1\" ], [ \"/mnt/pmemfs1/datafile1\" ] ]"
-  export BETREE__STORAGE__TIERS="[ [ { path = \"/mnt/pmemfs0/haura/datafile\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/mnt/pmemfs1/haura/datafile\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
-  #export BETREE__STORAGE__TIERS="[ [ { path = \"/mnt/pmemfs0/datafile1\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/mnt/pmemfs1/datafile1\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
-  #export BETREE__STORAGE__TIERS="[ [ { mem = $((100 * 1024 * 1024 * 1024)) } ], [ { mem = $((100 * 1024 * 1024 * 1024)) } ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ \"/my/path/to/file1" ], [ \"/my/path/to/file2\" ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/path/to/file1", direct = false } ], [ { path = \"/my/path/to/file2", direct = false } ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/nvm/file1\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/my/nvm/file2\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
+  export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
 
   #local vdev_type="dram"
   local vdev_type="pmem"
@@ -146,9 +143,10 @@ function zip_tiered() {
       local total=10000
 
       #local vdev_type="dram"
-      local vdev_type="pmem"
+      #local vdev_type="pmem"
       #local vdev_type="ssd"
       #local vdev_type="pmem_fs"
+      export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
 
       for num_workers in 1 2 3 4 5 6 7 8 9 10; do
         echo "running with $num_workers workers"
@@ -157,27 +155,19 @@ function zip_tiered() {
 
         (
           export BETREE__ALLOC_STRATEGY='[[0],[0],[],[]]'
-          export BETREE__STORAGE__TIERS="[ [ \"/vol1/datafile1\" ] ]"
           run "$vdev_type" "zip_tiered_all0_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
         )
 
         (
           export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
-          export BETREE__STORAGE__TIERS="[ [ \"/mnt/pmemfs0/datafile1\" ], [ \"/mnt/pmemfs1/datafile1\" ] ]"
           run "$vdev_type" "zip_tiered_id_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
         )
 
         (
           export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
-          export BETREE__STORAGE__TIERS="[ [ \"/mnt/pmemfs0/datafile1\" ], [ \"/mnt/pmemfs1/datafile1\" ] ]"
           run "$vdev_type" "zip_tiered_all1_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
         )
 
-        (
-          export BETREE__ALLOC_STRATEGY="[[0], [0], [], []]"
-          export BETREE__STORAGE__TIERS="[ [ { mem = $((4 * 1024 * 1024 * 1024)) } ] ]"
-          run "$vdev_type" "zip_tiered_mem_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
-        )
       done
     )
   done
