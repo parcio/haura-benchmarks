@@ -37,7 +37,9 @@ enum Mode {
 
 fn run_all(mode: Mode) -> Result<(), Box<dyn Error>> {
     thread::spawn(|| betree_perf::log_process_info("proc.jsonl", 250));
-    let mut sysinfo = process::Command::new("/home/skarim/myrepo/haura/betree/haura-benchmarks/target/release/sysinfo-log")
+
+    let root = std::env::var("ROOT").expect("Didn't provide a repository ROOT");
+    let mut sysinfo = process::Command::new(format!("{root}/target/release/sysinfo-log"))
         .args(&["--output", "sysinfo.jsonl", "--interval-ms", "250"])
         .spawn()?;
 
