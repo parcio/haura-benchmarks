@@ -41,7 +41,7 @@ function run {
   echo "running $mode with these settings:"
   env | grep BETREE__
   env > "env"
-  bectl config print-active > "config"
+  "$ROOT/../../target/release/bectl" config print-active > "config"
   "$ROOT/target/release/betree-perf" "$mode" "$@"
 
   echo "merging results into $out_path/out.jsonl"
