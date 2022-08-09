@@ -1,8 +1,7 @@
 import json
 import sys
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+import pandas as pd import matplotlib.pyplot as plt
 # %matplotlib inline
 
 from matplotlib import pyplot as plt
@@ -81,5 +80,5 @@ plt.xlabel("epochs")  # add X-axis label
 plt.ylabel("MB (I/0)")  # add Y-axis label
 plt.title("HAURA")  # add title
 #plt.xticks(epoch, rotation = 90)
-plt.show()
-plt.savefig(f"{sys.argv[1]}/plot.png")
+#plt.show()
+plt.savefig(f"{sys.argv[1]}/plot.svg")
