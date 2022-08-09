@@ -1,7 +1,8 @@
 import json
 import sys
 import numpy as np
-import pandas as pd import matplotlib.pyplot as plt
+import pandas as pd
+import matplotlib.pyplot as plt
 # %matplotlib inline
 
 from matplotlib import pyplot as plt
@@ -77,8 +78,9 @@ for x in range(4):
             plt.plot(epoch, reads, label = "Reads {}/{}".format(x,y))
 plt.legend()
 plt.xlabel("epochs")  # add X-axis label
-plt.ylabel("MB (I/0)")  # add Y-axis label
-plt.title("HAURA")  # add title
+plt.ylabel("MiB/s (I/0)")  # add Y-axis label
+label=' | '.join(sys.argv[1].split('/')[-2:])
+plt.title(f"Haura - {label}")  # add title
 #plt.xticks(epoch, rotation = 90)
 #plt.show()
 plt.savefig(f"{sys.argv[1]}/plot.svg")
