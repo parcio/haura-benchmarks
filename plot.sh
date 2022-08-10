@@ -1,7 +1,7 @@
 #!/bin/env bash
 
 function prepare {
-    if docker image inspect haura_plots
+    if docker image inspect haura_plots > /dev/null 2>&1
     then
         return
     else
