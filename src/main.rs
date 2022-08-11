@@ -5,6 +5,7 @@ use structopt::StructOpt;
 
 mod ingest;
 mod rewrite;
+mod scientific_evaluation;
 mod switchover;
 mod tiered1;
 mod zip;
@@ -15,6 +16,10 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[derive(StructOpt)]
 enum Mode {
     Tiered1,
+    Evaluation{
+        #[structopt(default_value = "120")]
+        runtime: u64,
+    },
     Zip {
         n_clients: u32,
         runs_per_client: u32,
@@ -49,6 +54,13 @@ fn run_all(mode: Mode) -> Result<(), Box<dyn Error>> {
         Mode::Tiered1 => {
             let client = control.client(0, b"tiered1");
             tiered1::run(client)?;
+            control.database.write().sync()?;
+        }
+        Mode::Evaluation {
+            runtime,
+        } => {
+            let client = control.client(0, b"scientific_evaluation");
+            scientific_evaluation::run(client, runtime)?;
             control.database.write().sync()?;
         }
         Mode::Zip {

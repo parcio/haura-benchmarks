@@ -59,7 +59,6 @@ function run {
 
 cargo build --release
 
-export RUST_LOG=warn
 export BETREE_CONFIG="$PWD/perf-config.json"
 export ROOT="$PWD"
 
@@ -89,6 +88,35 @@ function tiered() {
   (
     export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
     run "$vdev_type" tiered1_all1_alloc tiered1
+  )
+}
+
+function scientific_evaluation() {
+  #export PMEM_NO_CLWB=1
+  #export BETREE__CACHE_SIZE=$((4 * 1024 * 1024 * 1024))
+  #export BETREE__STORAGE__TIERS="[ [ \"/my/path/to/file1" ], [ \"/my/path/to/file2\" ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/path/to/file1", direct = false } ], [ { path = \"/my/path/to/file2", direct = false } ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/nvm/file1\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/my/nvm/file2\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
+
+  #local vdev_type="dram"
+  #local vdev_type="pmem"
+  #local vdev_type="ssd"
+  #local vdev_type="pmem_fs"
+
+  (
+    export BETREE__ALLOC_STRATEGY='[[0],[0],[],[]]'
+    run "$vdev_type" scientific_evaluation_all0_alloc evaluation
+  )
+
+  (
+    export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
+    run "$vdev_type" scientific_evaluation_id_alloc evaluation
+  )
+
+  (
+    export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
+    run "$vdev_type" scientific_evaluation_all1_alloc evaluation
   )
 }
 
@@ -208,6 +236,7 @@ function switchover() {
 
 zip_tiered
 #tiered
+#scientific_evaluation
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
   #export RUST_LOG=info
