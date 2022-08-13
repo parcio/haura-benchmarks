@@ -56,10 +56,10 @@ impl Control {
 
         log::info!("using {:?}", cfg);
 
-        let database = Database::build(cfg).expect("Failed to open database");
+        let database = Database::build_threaded(cfg).expect("Failed to open database");
 
         Control {
-            database: Arc::new(RwLock::new(database)),
+            database,
         }
     }
 
