@@ -27,8 +27,7 @@ pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
         let length = client.rng.next_u64();
         positions.push((
             start,
-            length
-                .clamp(0, (OBJECT_SIZE as f64 * 0.1) as u64)
+            (length % (OBJECT_SIZE as f64 * 0.006) as u64)
                 .clamp(0, OBJECT_SIZE.saturating_sub(start)),
         ));
     }
