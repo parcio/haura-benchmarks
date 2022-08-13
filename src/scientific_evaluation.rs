@@ -8,7 +8,8 @@ use std::{error::Error, io::Write};
 
 pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
     const OBJECT_SIZE: u64 = 10 * 1024 * 1024 * 1024;
-    const N_POSITIONS: u64 = 1024;
+    const FETCH_SIZE: u64 = 12 * 1024 * 1024;
+    const N_POSITIONS: u64 = 256;
     println!("running scientific_evaluation");
 
     let (obj, _info) = client
@@ -27,7 +28,7 @@ pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
         let length = client.rng.next_u64();
         positions.push((
             start,
-            (length % (OBJECT_SIZE as f64 * 0.006) as u64)
+            (length % FETCH_SIZE as u64)
                 .clamp(0, OBJECT_SIZE.saturating_sub(start)),
         ));
     }
