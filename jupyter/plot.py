@@ -3,7 +3,11 @@ import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 # %matplotlib inline
+
+# Constants
+BLOCK_SIZE = 4096
 
 from matplotlib import pyplot as plt
 plt.figure(figsize=(15,5))
@@ -27,21 +31,17 @@ if len(sys.argv) < 2:
     exit(1)
 
 fs = open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r')
+
 line_number = 0
-  
 while True:
     line_number += 1
-  
     # Get next line from file
     line = fs.readline()
-  
     # if line is empty
     # end of file is reached
     if not line:
         break
-        
     json_object = json.loads(line)
-
     data.append(json_object);
     
 # print("{}".format(data))
@@ -53,8 +53,8 @@ df = pd.DataFrame(data)
 epoch = [temp['epoch_ms'] for temp in data]
 
 subtract_first_index(epoch)
-epoch = np.divide(epoch, 60)
-epoch = epoch.astype(int)
+
+fig, ax = plt.subplots(figsize=(15,5))
 
 for x in range(4):
     for y in range(4):
@@ -71,16 +71,27 @@ for x in range(4):
             subtract_last_index(writes)
             subtract_last_index(reads)
 
-            writes = np.divide(writes, 1024)
-            reads = np.divide(reads, 1024)
-            
-            plt.plot(epoch, writes, label = "Writes {}/{}".format(x,y))
-            plt.plot(epoch, reads, label = "Reads {}/{}".format(x,y))
-plt.legend()
-plt.xlabel("epochs")  # add X-axis label
-plt.ylabel("MiB/s (I/0)")  # add Y-axis label
+            # convert to MiB from Blocks
+            # NOTE: We assume here a block size of 4096 bytes as this is the default haura block size
+            # if you change this you'll need to modify this here too.
+            writes = writes * BLOCK_SIZE / 1024 / 1024
+            reads = reads * BLOCK_SIZE / 1024 / 1024
+
+            ax.plot(epoch, writes, label = "Writes {}/{}".format(x,y))
+            ax.plot(epoch, reads, label = "Reads {}/{}".format(x,y))
+fig.legend()
+# Epoch in seconds
+ms_to_string = lambda time: f"{int(time / 1000 / 60)}:{int(time / 1000) % 60:02d}"
+epoch_formatted = list(map(ms_to_string, epoch))
+ax.set_xlabel("runtime (minute:seconds)")  # add X-axis label
+ax.set_xticks(epoch, epoch_formatted)
+ax.locator_params(tight=True, nbins=10)
+# tenth = ticker.MultipleLocator(base=10.0)
+#pl.axis()[1].set_major_locator(tenth)
+
+ax.set_ylabel("MiB/s (I/0)")  # add Y-axis label
 label=' | '.join(sys.argv[1].split('/')[-2:])
-plt.title(f"Haura - {label}")  # add title
+ax.set_title(f"Haura - {label}")  # add title
 #plt.xticks(epoch, rotation = 90)
 #plt.show()
-plt.savefig(f"{sys.argv[1]}/plot.svg")
+fig.savefig(f"{sys.argv[1]}/plot.svg")
