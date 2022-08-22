@@ -12,6 +12,7 @@ pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
     const N_POSITIONS: u64 = 256;
     println!("running scientific_evaluation");
 
+    let start = std::time::Instant::now();
     let (obj, _info) = client
         .object_store
         .open_or_create_object_with_pref(b"important_research", StoragePreference::FAST)?;
@@ -20,6 +21,7 @@ pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
     with_random_bytes(&mut client.rng, OBJECT_SIZE, 8 * 1024 * 1024, |b| {
         cursor.write_all(b)
     })?;
+    println!("Initial write took {}s", start.elapsed().as_secs());
     client.sync().expect("Failed to sync database");
     // Generate positions to read
     let mut positions = vec![];
@@ -39,15 +41,14 @@ pub fn run(mut client: Client, runtime: u64) -> Result<(), Box<dyn Error>> {
         .expect("Object was just created, but can't be opened!");
 
     let start = std::time::Instant::now();
+    let mut buf = vec![0; FETCH_SIZE as usize];
     for (pos, len) in positions.iter().cycle() {
-        let mut buf = vec![0; *len as usize];
-        obj.read_at(&mut buf, *pos).unwrap();
-        // simulate some work done on the data
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        if start.elapsed().as_secs() > runtime {
+        // Read data as may be done in some evaluation where only parts of a
+        // database file are read in.
+        obj.read_at(&mut buf[..*len as usize], *pos).unwrap();
+        if start.elapsed().as_secs() >= runtime {
             break;
         }
     }
-
     Ok(())
 }
