@@ -20,6 +20,11 @@ function ensure_prepared {
   fi
 }
 
+function ensure_bectl {
+  cd ../../bectl || exit
+  cargo build --release
+}
+
 function run {
   local vdev_type="$1"
   local name="$2"
@@ -64,15 +69,15 @@ export ROOT="$PWD"
 
 function tiered() {
   #export PMEM_NO_CLWB=1
-  #export BETREE__CACHE_SIZE=$((1 * 1024 * 1024 * 1024))
+  #export BETREE__CACHE_SIZE=$((4 * 1024 * 1024 * 1024))
   #export BETREE__STORAGE__TIERS="[ [ \"/my/path/to/file1" ], [ \"/my/path/to/file2\" ] ]"
   #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/path/to/file1", direct = false } ], [ { path = \"/my/path/to/file2", direct = false } ] ]"
   #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/nvm/file1\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/my/nvm/file2\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
-  export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
+  #export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
 
   #local vdev_type="dram"
-  local vdev_type="pmem"
-  #local vdev_type="ssd"
+  #local vdev_type="pmem"
+  #local vdev_type="dram_nvme"
   #local vdev_type="pmem_fs"
 
   (
@@ -93,7 +98,7 @@ function tiered() {
 
 function scientific_evaluation() {
   #export PMEM_NO_CLWB=1
-  #export BETREE__CACHE_SIZE=$((4 * 1024 * 1024 * 1024))
+  #export BETREE__CACHE_SIZE=$((1 * 1024 * 1024 * 1024))
   #export BETREE__STORAGE__TIERS="[ [ \"/my/path/to/file1" ], [ \"/my/path/to/file2\" ] ]"
   #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/path/to/file1", direct = false } ], [ { path = \"/my/path/to/file2", direct = false } ] ]"
   #export BETREE__STORAGE__TIERS="[ [ { path = \"/my/nvm/file1\", len = $((100 * 1024 * 1024 * 1024)) } ], [ { path = \"/my/nvm/file2\", len = $((100 * 1024 * 1024 * 1024 )) } ] ]"
@@ -103,21 +108,8 @@ function scientific_evaluation() {
   #local vdev_type="pmem"
   #local vdev_type="ssd"
   #local vdev_type="pmem_fs"
-
-  (
-    export BETREE__ALLOC_STRATEGY='[[0],[0],[],[]]'
-    run "$vdev_type" scientific_evaluation_all0_alloc evaluation
-  )
-
-  (
-    export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
-    run "$vdev_type" scientific_evaluation_id_alloc evaluation
-  )
-
-  (
-    export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
-    run "$vdev_type" scientific_evaluation_all1_alloc evaluation
-  )
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
+  run "$vdev_type" scientific_evaluation_id_alloc evaluation 30
 }
 
 function zip_cache() {
@@ -234,9 +226,11 @@ function switchover() {
   run "default" switchover_large switchover 4 "$((8 * 1024 * 1024 * 1024))"
 }
 
-zip_tiered
+ensure_bectl
+
+#zip_tiered
 #tiered
-#scientific_evaluation
+scientific_evaluation
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
   #export RUST_LOG=info
