@@ -3,6 +3,7 @@ use std::{error::Error, path::PathBuf, process, thread, time::Duration};
 use betree_perf::Control;
 use structopt::StructOpt;
 
+mod checkpoints;
 mod ingest;
 mod rewrite;
 mod scientific_evaluation;
@@ -16,6 +17,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[derive(StructOpt)]
 enum Mode {
     Tiered1,
+    Checkpoints,
     Evaluation{
         #[structopt(default_value = "120")]
         runtime: u64,
@@ -54,6 +56,11 @@ fn run_all(mode: Mode) -> Result<(), Box<dyn Error>> {
         Mode::Tiered1 => {
             let client = control.client(0, b"tiered1");
             tiered1::run(client)?;
+            control.database.write().sync()?;
+        }
+        Mode::Checkpoints => {
+            let client = control.client(0, b"tiered1");
+            checkpoints::run(client)?;
             control.database.write().sync()?;
         }
         Mode::Evaluation {
