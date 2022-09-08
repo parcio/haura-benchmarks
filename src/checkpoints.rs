@@ -12,7 +12,7 @@ use std::{error::Error, io::Write};
 pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     const N_OBJECTS: usize = 5;
     const OBJECT_SIZE_MIB: [u64; N_OBJECTS] = [256, 256, 1, 384, 128];
-    const N_GENERATIONS: usize = 20;
+    const N_GENERATIONS: usize = 70;
     const MIN_WAIT_MS: u64 = 1500;
     const WAIT_RAND_RANGE: u64 = 400;
     println!("running checkpoints");
@@ -20,6 +20,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     for gen in 0..N_GENERATIONS {
         for obj_id in 0..N_OBJECTS {
             let key = format!("{gen}_{obj_id}");
+            println!("Creating {key}");
             let (obj, _info) = client
                 .object_store
                 .open_or_create_object_with_pref(key.as_bytes(), StoragePreference::FASTEST)?;
