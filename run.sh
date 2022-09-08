@@ -21,8 +21,9 @@ function ensure_prepared {
 }
 
 function ensure_bectl {
-  cd ../../bectl || exit
+  pushd ../../bectl || exit
   cargo build --release
+  popd || return
 }
 
 function run {
@@ -110,6 +111,15 @@ function scientific_evaluation() {
   #local vdev_type="pmem_fs"
   export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
   run "$vdev_type" scientific_evaluation_id_alloc evaluation 30
+}
+
+function checkpoints() {
+  #local vdev_type="dram"
+  #local vdev_type="pmem"
+  #local vdev_type="ssd"
+  #local vdev_type="pmem_fs"
+  export BETREE__ALLOC_STRATEGY='[[0, 1],[1],[],[]]'
+  run "$vdev_type" checkpoints_fastest checkpoints
 }
 
 function zip_cache() {
@@ -231,6 +241,7 @@ ensure_bectl
 #zip_tiered
 #tiered
 scientific_evaluation
+#checkpoints
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
   #export RUST_LOG=info
