@@ -8,6 +8,8 @@ import matplotlib.ticker as ticker
 
 # Constants
 BLOCK_SIZE = 4096
+EPOCH_MS=500
+SEC_MS=1000
 
 from matplotlib import pyplot as plt
 
@@ -45,8 +47,8 @@ def plot_throughput(data):
                 # convert to MiB from Blocks
                 # NOTE: We assume here a block size of 4096 bytes as this is the default haura block size
                 # if you change this you'll need to modify this here too.
-                writes = writes * BLOCK_SIZE / 1024 / 1024
-                reads = reads * BLOCK_SIZE / 1024 / 1024
+                writes = writes * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
+                reads = reads * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
 
                 ax.plot(epoch, writes, label = "Writes {}/{}".format(x,y))
                 ax.plot(epoch, reads, label = "Reads {}/{}".format(x,y))
