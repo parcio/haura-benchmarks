@@ -13,6 +13,8 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     const N_OBJECTS: usize = 5;
     const OBJECT_SIZE_MIB: [u64; N_OBJECTS] = [256, 256, 1, 384, 128];
     const N_GENERATIONS: usize = 20;
+    const MIN_WAIT_MS: u64 = 1500;
+    const WAIT_RAND_RANGE: u64 = 400;
     println!("running checkpoints");
 
     for gen in 0..N_GENERATIONS {
@@ -28,6 +30,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                 cursor.write_all(b)
             })?;
         }
+        std::thread::sleep(std::time::Duration::from_millis(client.rng.next_u64() % WAIT_RAND_RANGE + MIN_WAIT_MS));
         client.sync().expect("Failed to sync database");
     }
     client.sync().expect("Failed to sync database");
