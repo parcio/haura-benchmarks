@@ -18,7 +18,8 @@ fn pref(foo: u8, space: &mut Vec<u64>, size: u64) -> StoragePreference {
             space[2] -= size;
             StoragePreference::SLOW
         }
-        _ => panic!(),
+        3.. => panic!(),
+        _ => pref(foo + 1, space, size)
     }
 }
 
