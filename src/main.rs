@@ -4,6 +4,7 @@ use betree_perf::Control;
 use structopt::StructOpt;
 
 mod checkpoints;
+mod filesystem;
 mod ingest;
 mod rewrite;
 mod scientific_evaluation;
@@ -18,7 +19,8 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 enum Mode {
     Tiered1,
     Checkpoints,
-    Evaluation{
+    Filesystem,
+    Evaluation {
         #[structopt(default_value = "120")]
         runtime: u64,
     },
@@ -59,13 +61,16 @@ fn run_all(mode: Mode) -> Result<(), Box<dyn Error>> {
             control.database.write().sync()?;
         }
         Mode::Checkpoints => {
-            let client = control.client(0, b"tiered1");
+            let client = control.client(0, b"checkpoints");
             checkpoints::run(client)?;
             control.database.write().sync()?;
         }
-        Mode::Evaluation {
-            runtime,
-        } => {
+        Mode::Filesystem => {
+            let client = control.client(0, b"filesystem");
+            filesystem::run(client)?;
+            control.database.write().sync()?;
+        }
+        Mode::Evaluation { runtime } => {
             let client = control.client(0, b"scientific_evaluation");
             scientific_evaluation::run(client, runtime)?;
             control.database.write().sync()?;
