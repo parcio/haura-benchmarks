@@ -56,10 +56,11 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             for _ in 0..(*num_objs as f32 * DISTRIBUTION[size_grp]) as usize {
                 let size = client.rng.gen_range(SIZES[size_grp].clone());
                 let pref = pref(client.rng.gen_range(TIERS), &mut space, size);
+                let key = format!("key{counter}").into_bytes();
                 let (obj, _info) = client
                     .object_store
-                    .open_or_create_object_with_pref(&counter.to_le_bytes(), pref)?;
-                objs.push(counter.to_le_bytes());
+                    .open_or_create_object_with_pref(&key, pref)?;
+                objs.push(key);
                 counter += 1;
                 let mut cursor = obj.cursor_with_pref(pref);
                 with_random_bytes(&mut client.rng, size, 8 * 1024 * 1024, |b| {
