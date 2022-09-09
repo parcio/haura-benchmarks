@@ -122,6 +122,15 @@ function checkpoints() {
   run "$vdev_type" checkpoints_fastest checkpoints
 }
 
+function filesystem() {
+  #local vdev_type="dram"
+  #local vdev_type="pmem"
+  #local vdev_type="ssd"
+  #local vdev_type="pmem_fs"
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[2],[]]'
+  run "$vdev_type" file_system_three filesystem
+}
+
 function zip_cache() {
   local F="$PWD/data/linux.zip"
   local F_CD_START=1040032667
@@ -241,6 +250,7 @@ ensure_bectl
 #zip_tiered
 #tiered
 scientific_evaluation
+#filesystem
 #checkpoints
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
