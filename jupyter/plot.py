@@ -1,17 +1,19 @@
+#! /bin/env python
 import json
 import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-# %matplotlib inline
-
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.cm as cm
+import matplotlib.colors as mat_col
+import matplotlib
+    
 # Constants
 BLOCK_SIZE = 4096
 EPOCH_MS=500
 SEC_MS=1000
-
-from matplotlib import pyplot as plt
 
 def subtract_last_index(array):
     last_val = 0
@@ -97,31 +99,102 @@ def plot_latency(data):
     ax.set_title(f"Haura - {label}")  # add title
     fig.savefig(f"{sys.argv[1]}/plot_latency.svg")
 
-data = []
+# Access string subslice and first tuple member
+def sort_by_o_id(key):
+    return int(key[0][2:])
+
+def plot_object_distribution():
+    print("reading in data")
+    fs = open(f"{sys.argv[1]}/tier_state.jsonl", 'r')
+    data = read_jsonl(fs)
+    fs.close()
+    
+    colors = {
+        0: "white",
+        1: "#009E73",
+        2: "#F0E442",
+        3: "#0072B2",
+    }    
+    cmap = mat_col.ListedColormap([colors[x] for x in colors.keys()])
+    labels = np.array(["Not present", "Fastest", "Fast", "Slow"])
+    
+    num_ts = 0
+    for current_timestep in data:
+        # Read all names and order
+        # Iterate over each tier and add keys to known keys
+        keys = []  # Vec<(key, num_tier)>
+        num_tier = 1
+        print("fetching keys")
+        for tier in current_timestep:
+            for object in tier["files"]:
+                keys.append((object, num_tier))
+            num_tier += 1
+    
+        print("sorting keys")
+        keys.sort(key=sort_by_o_id)
+    
+        # old boundaries update when needed
+        # seldom accessed 1-2000 (45x45)
+        # barely accessed 2001-2300 (18x18)
+        # often accessed 2301-2320 (5x5)
+        group_1 = [n[1] for n in keys[:2000]]
+        group_2 = [n[1] for n in keys[2000:2300]]
+        group_3 = [n[1] for n in keys[2300:2320]]
+    
+        # Reshape to matrix and fill with zeros if necessary
+        print("shaping data")
+        group_1 = np.concatenate((np.array(group_1), np.zeros(2025 - len(group_1)))).reshape((45,45))
+        group_2 = np.concatenate((np.array(group_2), np.zeros(324 - len(group_2)))).reshape((18,18))
+        group_3 = np.concatenate((np.array(group_3), np.zeros(25 - len(group_3)))).reshape((5,5))
+    
+        num_group = 0
+        fig, axs = plt.subplots(1, 3, figsize=(20,5))
+        for group in [group_1, group_2, group_3]:
+            subax = axs[num_group]
+            match num_group:
+                case 0:
+                    subax.set_title("Seldomly Accessed (1%)")
+                case 1:
+                    subax.set_title("Occassionally Accessed (10%)")
+                case 2:
+                    subax.set_title("Often Accessed (60%)")
+            num_group += 1
+            subax.imshow(group, cmap=cmap)
+        #divider = make_axes_locatable(subax)
+        #cax = divider.append_axes("right", size="5%", pad=0.05) 
+        #fig.colorbar(im, cax=cax)
+        fmt = matplotlib.ticker.FuncFormatter(lambda x, pos: labels[x])
+        norm = matplotlib.colors.BoundaryNorm(np.array([0,1,2,3]), len(labels), clip=True)
+        ticks = [0, 1, 2, 3]
+        fig.colorbar(cm.ScalarMappable(cmap=cmap, norm=mat_col.NoNorm()), format=fmt, ticks=ticks)
+        fig.savefig(f"{sys.argv[1]}/plot_timestep_{num_ts:0>3}.png")
+        num_ts += 1
+
+def read_jsonl(file):
+    data = []
+    while True:
+        # Get next line from file
+        line = file.readline()
+        # if line is empty
+        # end of file is reached
+        if not line:
+            break
+        json_object = json.loads(line)
+        data.append(json_object);
+    return data
 
 if len(sys.argv) < 2:
     print("Please specify an input run directory. If you already completed benchmarks they can be found under `results/*`.")
     exit(1)
 
-fs = open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r')
 
-line_number = 0
-while True:
-    line_number += 1
-    # Get next line from file
-    line = fs.readline()
-    # if line is empty
-    # end of file is reached
-    if not line:
-        break
-    json_object = json.loads(line)
-    data.append(json_object);
-    
+print("reading intiital data")
+fs = open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r')
 # print("{}".format(data))
-  
+data = read_jsonl(fs)
 fs.close()
 
-df = pd.DataFrame(data)
-
-plot_throughput(data)
-plot_latency(data)
+# Plot actions
+#plot_throughput(data)
+#plot_latency(data)
+plot_object_distribution()
