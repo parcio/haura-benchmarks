@@ -74,6 +74,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     client.sync().expect("Failed to sync database");
 
     println!("start reading");
+    let mut buf = vec![0; 2 * 1024 * 1024 * 1024];
     let mut samplers: Vec<DistIter<_,_,_>> = groups.iter().map(|ob| thread_rng().sample_iter(Slice::new(&ob).unwrap())).collect();
     for _ in 0..10000 {
         for (id, prob) in PROBS.iter().enumerate() {
@@ -82,7 +83,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                 let obj = client
                     .object_store
                     .open_object(obj)?.unwrap();
-                for _ in obj.read_all_chunks()? {}
+                obj.read_at(&mut buf, 0).map_err(|e| e.1)?;
             }
         }
     }
