@@ -15,7 +15,7 @@ function plot {
 
     docker run -v "$PWD":/usr/src/bench -w /usr/src/bench haura_plots python jupyter/plot.py "$run"
     pushd "$run"
-    if -e plot_timestep_000.png
+    if [ -e plot_timestep_000.png ]
     then
         ffmpeg -framerate 2 -i plot_timestep_%03d.png -c:v libx264 -pix_fmt yuv420p plot_timestep.mp4
     fi
