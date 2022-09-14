@@ -1,25 +1,30 @@
 ///!
 use betree_perf::*;
 use betree_storage_stack::StoragePreference;
-use rand::{Rng, RngCore, distributions::{Slice, DistIter}, thread_rng};
+use rand::{Rng, distributions::{Slice, DistIter}, thread_rng};
 use std::{error::Error, io::Write, ops::Range};
 
-fn pref(foo: u8, space: &mut Vec<u64>, size: u64) -> StoragePreference {
+fn pref(foo: u8, size: u64, client: &Client) -> StoragePreference {
+    let space = client
+            .database
+            .read()
+            .free_space_tier()
+            .iter()
+            .map(|tier| tier.free.to_bytes())
+            .collect::<Vec<u64>>();
+
     match foo {
         0 if space[0] > size => {
-            space[0] -= size;
             StoragePreference::FASTEST
         }
         1 if space[1] > size => {
-            space[1] -= size;
             StoragePreference::FAST
         }
         2 if space[2] > size => {
-            space[2] -= size;
             StoragePreference::SLOW
         }
         3.. => panic!(),
-        _ => pref(foo + 1, space, size)
+        _ => pref(foo + 1, size, client)
     }
 }
 
@@ -36,14 +41,6 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     const DISTRIBUTION: [f32; 3] = [0.9, 0.09, 0.01];
     const TIERS: Range<u8> = 0..3;
 
-    let mut space = client
-        .database
-        .read()
-        .free_space_tier()
-        .iter()
-        .map(|tier| tier.free.to_bytes())
-        .collect::<Vec<u64>>();
-
     println!("running filesystem");
     println!("initialize state");
 
@@ -55,7 +52,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
         for size_grp in 0..3 {
             for _ in 0..(*num_objs as f32 * DISTRIBUTION[size_grp]) as usize {
                 let size = client.rng.gen_range(SIZES[size_grp].clone());
-                let pref = pref(client.rng.gen_range(TIERS), &mut space, size);
+                let pref = pref(client.rng.gen_range(TIERS), size, &client);
                 let key = format!("key{counter}").into_bytes();
                 let (obj, _info) = client
                     .object_store
@@ -66,6 +63,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                 with_random_bytes(&mut client.rng, size, 8 * 1024 * 1024, |b| {
                     cursor.write_all(b)
                 })?;
+                client.sync().expect("Could not write object to disk completely. Check policy or benchmark disk utilization.");
             }
         }
     }
