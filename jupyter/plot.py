@@ -154,6 +154,8 @@ def plot_object_distribution():
             num_group += 1
             im = subax.imshow(group, cmap=cmap)
             im.set_clim(0, num_tier)
+            subax.yaxis.set_ticks([])
+            subax.xaxis.set_ticks([])
         #divider = make_axes_locatable(subax)
         #cax = divider.append_axes("right", size="5%", pad=0.05) 
         #fig.colorbar(im, cax=cax)
@@ -198,6 +200,7 @@ def plot_object_distribution():
     ax.set_xlabel("Timestep")
     ax.set_ylabel("Mean object tier")
     ax.set_title("Mean tier of all object groups over time")
+    ax.set_ylim((1,3))
     pls_no_cut_off = ax.legend(bbox_to_anchor=(1.0,1.0), loc="upper left")
     fig.savefig(f"{sys.argv[1]}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
 
