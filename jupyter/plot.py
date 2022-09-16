@@ -116,6 +116,8 @@ def plot_object_distribution():
     cmap = mat_col.ListedColormap([colors[x] for x in colors.keys()])
     labels = np.array(["Not present", "Fastest", "Fast", "Slow"])
     num_ts = 0
+    # three groups fixed
+    mean_group_vals = [[], [], []]
     for current_timestep in data:
         # Read all names and order
         # Iterate over each tier and add keys to known keys
@@ -146,6 +148,7 @@ def plot_object_distribution():
         for group in [group_1, group_2, group_3]:
             subax = axs[num_group]
             mean = group[group > 0].mean()
+            mean_group_vals[num_group].append(mean)
             subax.set_title(f"Object mean level: {mean}")
             subax.tick_params(color="white")
             num_group += 1
@@ -187,6 +190,16 @@ def plot_object_distribution():
         matplotlib.pyplot.close(fig)
         num_ts += 1
 
+    fig, ax = plt.subplots(figsize=(10,5))
+    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group");
+    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed");
+    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed");
+    # we might want to pick the actual timestamps for this
+    ax.set_xlabel("Timestep")
+    ax.set_ylabel("Mean object tier")
+    ax.set_title("Mean tier of all object groups over time")
+    pls_no_cut_off = ax.legend(bbox_to_anchor=(1.0,1.0), loc="upper left")
+    fig.savefig(f"{sys.argv[1]}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
 
 def read_jsonl(file):
     data = []
