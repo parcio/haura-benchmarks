@@ -104,11 +104,9 @@ def sort_by_o_id(key):
     return int(key[0][2:])
 
 def plot_object_distribution():
-    print("reading in data")
     fs = open(f"{sys.argv[1]}/tier_state.jsonl", 'r')
     data = read_jsonl(fs)
     fs.close()
-    
     colors = {
         0: "white",
         1: "#009E73",
@@ -117,20 +115,17 @@ def plot_object_distribution():
     }    
     cmap = mat_col.ListedColormap([colors[x] for x in colors.keys()])
     labels = np.array(["Not present", "Fastest", "Fast", "Slow"])
-    
     num_ts = 0
     for current_timestep in data:
         # Read all names and order
         # Iterate over each tier and add keys to known keys
         keys = []  # Vec<(key, num_tier)>
         num_tier = 1
-        print("fetching keys")
         for tier in current_timestep:
             for object in tier["files"]:
                 keys.append((object, num_tier))
             num_tier += 1
     
-        print("sorting keys")
         keys.sort(key=sort_by_o_id)
     
         # old boundaries update when needed
@@ -142,33 +137,56 @@ def plot_object_distribution():
         group_3 = [n[1] for n in keys[2300:2320]]
     
         # Reshape to matrix and fill with zeros if necessary
-        print("shaping data")
         group_1 = np.concatenate((np.array(group_1), np.zeros(2025 - len(group_1)))).reshape((45,45))
         group_2 = np.concatenate((np.array(group_2), np.zeros(324 - len(group_2)))).reshape((18,18))
         group_3 = np.concatenate((np.array(group_3), np.zeros(25 - len(group_3)))).reshape((5,5))
     
         num_group = 0
-        fig, axs = plt.subplots(1, 3, figsize=(20,5))
+        fig, axs = plt.subplots(1, 4, figsize=(20,5))
         for group in [group_1, group_2, group_3]:
             subax = axs[num_group]
-            match num_group:
-                case 0:
-                    subax.set_title("Seldomly Accessed (1%)")
-                case 1:
-                    subax.set_title("Occassionally Accessed (10%)")
-                case 2:
-                    subax.set_title("Often Accessed (60%)")
+            mean = group[group > 0].mean()
+            subax.set_title(f"Object mean level: {mean}")
+            subax.tick_params(color="white")
             num_group += 1
-            subax.imshow(group, cmap=cmap)
+            im = subax.imshow(group, cmap=cmap)
+            im.set_clim(0, num_tier)
         #divider = make_axes_locatable(subax)
         #cax = divider.append_axes("right", size="5%", pad=0.05) 
         #fig.colorbar(im, cax=cax)
         fmt = matplotlib.ticker.FuncFormatter(lambda x, pos: labels[x])
-        norm = matplotlib.colors.BoundaryNorm(np.array([0,1,2,3]), len(labels), clip=True)
         ticks = [0, 1, 2, 3]
         fig.colorbar(cm.ScalarMappable(cmap=cmap, norm=mat_col.NoNorm()), format=fmt, ticks=ticks)
+
+        times = []
+        num_tiers = 0
+        for tier in current_timestep:
+            num_tiers += 1
+            resp_times = 0;
+            total = 0;
+            for o_id in tier["reqs"]:
+                resps = tier["reqs"][f"{o_id}"]
+                size = tier["files"][f"{o_id}"][1]
+                for resp in resps:
+                    total += 1
+                    resp_times += resp["response_time"]["nanos"] / size
+            if total != 0:
+                times.append(resp_times / total)
+            else:
+                times.append(0)
+        x_ticks = np.arange(0, num_tiers)
+        width = 0.35
+        # convert from nanos to millis
+        axs[3].bar(x_ticks, np.array(times) / 1000000, width, label='Access latency', hatch=['.', '+', '/'], color='white', edgecolor='black')
+        axs[3].set_title('Mean access latency for timestep')
+        axs[3].set_ylabel('Mean latency in ms')
+        #axs[3].set_ylim(0, 100)
+        axs[3].set_xticks(x_ticks, labels=["Fastest", "Fast", "Slow"])
+
         fig.savefig(f"{sys.argv[1]}/plot_timestep_{num_ts:0>3}.png")
+        matplotlib.pyplot.close(fig)
         num_ts += 1
+
 
 def read_jsonl(file):
     data = []
@@ -195,6 +213,6 @@ data = read_jsonl(fs)
 fs.close()
 
 # Plot actions
-#plot_throughput(data)
+plot_throughput(data)
 #plot_latency(data)
 plot_object_distribution()
