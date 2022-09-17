@@ -1,25 +1,28 @@
 ///!
 use betree_perf::*;
-use betree_storage_stack::StoragePreference;
 use betree_storage_stack::vdev::Block;
-use rand::{Rng, distributions::{Slice, DistIter}, thread_rng};
+use betree_storage_stack::StoragePreference;
+use rand::{
+    distributions::{DistIter, Slice},
+    thread_rng, Rng,
+};
 use std::{error::Error, io::Write, ops::Range};
 
 fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
-   let space = client.database.read().free_space_tier();
-   match foo {
-       0 if Block(space[0].free.0 - size.0) > Block((space[0].total.0 as f64 * 0.2) as u64) => {
-           StoragePreference::FASTEST
-       }
-       1 if Block(space[1].free.0 - size.0) > Block((space[1].total.0 as f64 * 0.2) as u64) => {
-           StoragePreference::FAST
-       }
-       2 if Block(space[2].free.0 - size.0) > Block((space[2].total.0 as f64 * 0.2) as u64) => {
-           StoragePreference::SLOW
-       }
-       3.. => panic!(),
-       _ => pref(foo + 1, size, client)
-   }
+    let space = client.database.read().free_space_tier();
+    match foo {
+        0 if Block(space[0].free.0 - size.0) > Block((space[0].total.0 as f64 * 0.2) as u64) => {
+            StoragePreference::FASTEST
+        }
+        1 if Block(space[1].free.0 - size.0) > Block((space[1].total.0 as f64 * 0.2) as u64) => {
+            StoragePreference::FAST
+        }
+        2 if Block(space[2].free.0 - size.0) > Block((space[2].total.0 as f64 * 0.2) as u64) => {
+            StoragePreference::SLOW
+        }
+        3.. => panic!(),
+        _ => pref(foo + 1, size, client),
+    }
 }
 
 // barely, seldom, often
@@ -53,7 +56,11 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
         let objs = groups.last_mut().unwrap();
         for (count, size) in TIERS_SPEC[t_id].iter().zip(SIZES.iter()) {
             for _ in 0..*count {
-                let pref = pref(client.rng.gen_range(TIERS), Block::from_bytes(*size), &client);
+                let pref = pref(
+                    client.rng.gen_range(TIERS),
+                    Block::from_bytes(*size),
+                    &client,
+                );
                 let key = format!("key{counter}").into_bytes();
                 let (obj, _info) = client
                     .object_store
@@ -73,15 +80,16 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
 
     println!("start conditioning");
     let mut buf = vec![0; 2 * 1024 * 1024 * 1024];
-    let mut samplers: Vec<DistIter<_,_,_>> = groups.iter().map(|ob| thread_rng().sample_iter(Slice::new(&ob).unwrap())).collect();
+    let mut samplers: Vec<DistIter<_, _, _>> = groups
+        .iter()
+        .map(|ob| thread_rng().sample_iter(Slice::new(&ob).unwrap()))
+        .collect();
     while start.elapsed().as_secs() < 1200 {
         // println!("Reading generation {run} of {RUNS}");
         for (id, prob) in PROBS.iter().enumerate() {
             if client.rng.gen_bool(*prob) {
                 let obj = samplers[id].next().unwrap();
-                let obj = client
-                    .object_store
-                    .open_object(obj)?.unwrap();
+                let obj = client.object_store.open_object(obj)?.unwrap();
                 obj.read_at(&mut buf, 0).map_err(|e| e.1)?;
             }
         }
@@ -90,14 +98,37 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     std::thread::sleep(std::time::Duration::from_secs(30));
     println!("sync db");
     client.sync().expect("Failed to sync database");
-    println!("start measuring");
     // pick certain files which we know are in range, here we pick 3x64KB, 3x256KB, 3x1MB, 3x4MB, 1x1GB
     // Read individual files multiple times to see the cache working?
-    const SELECTION: [usize; 5] = [3,3,3,3,1];
+    const SELECTION: [usize; 5] = [3, 3, 3, 3, 1];
 
-    let f = std::fs::OpenOptions::new().write(true).create(true).open("filesystem_measurements.csv")?;
+    {
+        // Thrash Cache by writing random data into slow with a different object store
+        println!("destroying cache");
+        let os = client
+            .database
+            .write()
+            .open_named_object_store(b"destroycache", StoragePreference::SLOW)?;
+        let obj = os.create_object(b"foo")?;
+        let mut cursor = obj.cursor_with_pref(StoragePreference::SLOW);
+        with_random_bytes(
+            &mut client.rng,
+            1 * 1024 * 1024 * 1024,
+            8 * 1024 * 1024,
+            |b| cursor.write_all(b),
+        )?;
+        println!("sync db");
+        client.sync().expect("Failed to sync database");
+        // Cooldown
+        std::thread::sleep(std::time::Duration::from_secs(30));
+    }
+    println!("start measuring");
+    let f = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open("filesystem_measurements.csv")?;
     let mut w = std::io::BufWriter::new(f);
-    w.write_all(b"key,size,read_latency_ms,write_latency_ms\n")?;
+    w.write_all(b"key,size,read_latency_ns,write_latency_ns\n")?;
 
     for tier in TIERS {
         for (idx, sel_num) in SELECTION.iter().enumerate() {
@@ -106,7 +137,10 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             let okend = okstart + obj_num;
             for _ in 0..*sel_num {
                 let obj_key = format!("key{}", client.rng.gen_range(okstart..=okend));
-                let obj = client.object_store.open_object(obj_key.as_bytes())?.expect("Known object could not be opened");
+                let obj = client
+                    .object_store
+                    .open_object(obj_key.as_bytes())?
+                    .expect("Known object could not be opened");
                 let start = std::time::Instant::now();
                 obj.read_at(&mut buf, 0).map_err(|e| e.1)?;
                 let read_time = start.elapsed();
@@ -117,7 +151,14 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     cursor.write_all(b)
                 })?;
                 let write_time = start.elapsed();
-                w.write_all(format!("{obj_key},{size},{},{}\n", read_time.as_millis(), write_time.as_millis()).as_bytes())?;
+                w.write_all(
+                    format!(
+                        "{obj_key},{size},{},{}\n",
+                        read_time.as_nanos(),
+                        write_time.as_nanos()
+                    )
+                    .as_bytes(),
+                )?;
             }
         }
     }
