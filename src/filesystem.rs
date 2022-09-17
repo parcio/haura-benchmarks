@@ -86,6 +86,8 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    // Allow for some cooldown and migration ending...
+    std::thread::sleep(std::time::Duration::from_secs(30));
     println!("sync db");
     client.sync().expect("Failed to sync database");
     println!("start measuring");
