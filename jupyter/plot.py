@@ -134,9 +134,9 @@ def plot_object_distribution():
         # seldom accessed 1-2000 (45x45)
         # barely accessed 2001-2300 (18x18)
         # often accessed 2301-2320 (5x5)
-        group_1 = [n[1] for n in keys[:2000]]
-        group_2 = [n[1] for n in keys[2000:2300]]
-        group_3 = [n[1] for n in keys[2300:2320]]
+        group_1 = [n[1] for n in keys[:2015]]
+        group_2 = [n[1] for n in keys[2015:2339]]
+        group_3 = [n[1] for n in keys[2339:2364]]
     
         # Reshape to matrix and fill with zeros if necessary
         group_1 = np.concatenate((np.array(group_1), np.zeros(2025 - len(group_1)))).reshape((45,45))
