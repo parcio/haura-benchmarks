@@ -24,10 +24,9 @@ fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
 
 pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     // barely, seldom, often
-    const AMOUNT: [usize; 3] = [2015, 324, 25];
     const PROBS: [f64; 3] = [0.01, 0.2, 0.9];
 
-    // LNAL size reference
+    // LANL size reference
     const SIZES: [u64; 5] = [
         64 * 1000,
         256 * 1000,
@@ -37,9 +36,9 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     ];
     // Tuple describing the file distribution
     const TIERS_SPEC: [[usize; 5]; 3] = [
-        [511, 128, 682, 682, 12],
-        [82, 20, 110, 110, 2],
-        [6, 2, 8, 8, 1],
+        [1022, 256, 1364, 1364, 24],
+        [164, 40, 220, 220, 4],
+        [12, 4, 16, 16, 2],
     ];
 
     const TIERS: Range<u8> = 0..3;
@@ -74,7 +73,9 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     println!("start reading");
     let mut buf = vec![0; 2 * 1024 * 1024 * 1024];
     let mut samplers: Vec<DistIter<_,_,_>> = groups.iter().map(|ob| thread_rng().sample_iter(Slice::new(&ob).unwrap())).collect();
-    for _ in 0..10000 {
+    const RUNS: usize = 10000;
+    for run in 0..RUNS {
+        println!("Reading generation {run} of {RUNS}");
         for (id, prob) in PROBS.iter().enumerate() {
             if client.rng.gen_bool(*prob) {
                 let obj = samplers[id].next().unwrap();
