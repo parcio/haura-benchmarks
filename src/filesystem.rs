@@ -23,29 +23,37 @@ fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
 }
 
 pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
-    const SMALL: Range<u64> = (1 * 1024)..(256 * 1024);
-    const MEDIUM: Range<u64> = (1 * 1024 * 1024)..(200 * 1024 * 1024);
-    const LARGE: Range<u64> = (200 * 1024 * 1024)..(2 * 1024 * 1024 * 1024);
-    const SIZES: [Range<u64>; 3] = [SMALL, MEDIUM, LARGE];
     // barely, seldom, often
-    const AMOUNT: [usize; 3] = [2000, 300, 20];
+    const AMOUNT: [usize; 3] = [2015, 324, 25];
     const PROBS: [f64; 3] = [0.01, 0.2, 0.9];
 
-    // small, medium, large
-    const DISTRIBUTION: [f32; 3] = [0.9, 0.09, 0.01];
+    // LNAL size reference
+    const SIZES: [u64; 5] = [
+        64 * 1000,
+        256 * 1000,
+        1 * 1000 * 1000,
+        4 * 1000 * 1000,
+        1 * 1000 * 1000 * 1000,
+    ];
+    // Tuple describing the file distribution
+    const TIERS_SPEC: [[usize; 5]; 3] = [
+        [511, 128, 682, 682, 12],
+        [82, 20, 110, 110, 2],
+        [6, 2, 8, 8, 1],
+    ];
+
     const TIERS: Range<u8> = 0..3;
 
     println!("running filesystem");
     println!("initialize state");
     let mut groups = vec![];
     let mut counter: u64 = 1;
-    for num_objs in AMOUNT.iter() {
+    for t_id in 0..3 {
         groups.push(vec![]);
         let objs = groups.last_mut().unwrap();
-        for size_grp in 0..3 {
-            for _ in 0..(*num_objs as f32 * DISTRIBUTION[size_grp]) as usize {
-                let size = client.rng.gen_range(SIZES[size_grp].clone());
-                let pref = pref(client.rng.gen_range(TIERS), Block::from_bytes(size), &client);
+        for (count, size) in TIERS_SPEC[t_id].iter().zip(SIZES.iter()) {
+            for _ in 0..*count {
+                let pref = pref(client.rng.gen_range(TIERS), Block::from_bytes(*size), &client);
                 let key = format!("key{counter}").into_bytes();
                 let (obj, _info) = client
                     .object_store
@@ -53,7 +61,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                 objs.push(key);
                 counter += 1;
                 let mut cursor = obj.cursor_with_pref(pref);
-                with_random_bytes(&mut client.rng, size, 8 * 1024 * 1024, |b| {
+                with_random_bytes(&mut client.rng, *size, 8 * 1024 * 1024, |b| {
                     cursor.write_all(b)
                 })?;
             }
