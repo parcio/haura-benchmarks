@@ -134,14 +134,14 @@ def plot_object_distribution():
         # seldom accessed 1-2000 (45x45)
         # barely accessed 2001-2300 (18x18)
         # often accessed 2301-2320 (5x5)
-        group_1 = [n[1] for n in keys[:2015]]
-        group_2 = [n[1] for n in keys[2015:2339]]
-        group_3 = [n[1] for n in keys[2339:2364]]
-    
+        group_1 = [n[1] for n in keys[:4030]]
+        group_2 = [n[1] for n in keys[4030:4678]]
+        group_3 = [n[1] for n in keys[4678:4728]]
+
         # Reshape to matrix and fill with zeros if necessary
-        group_1 = np.concatenate((np.array(group_1), np.zeros(2025 - len(group_1)))).reshape((45,45))
-        group_2 = np.concatenate((np.array(group_2), np.zeros(324 - len(group_2)))).reshape((18,18))
-        group_3 = np.concatenate((np.array(group_3), np.zeros(25 - len(group_3)))).reshape((5,5))
+        group_1 = np.concatenate((np.array(group_1), np.zeros(4096 - len(group_1)))).reshape((64,64))
+        group_2 = np.concatenate((np.array(group_2), np.zeros(676 - len(group_2)))).reshape((26,26))
+        group_3 = np.concatenate((np.array(group_3), np.zeros(64 - len(group_3)))).reshape((8,8))
     
         num_group = 0
         fig, axs = plt.subplots(1, 4, figsize=(20,5))
@@ -153,7 +153,7 @@ def plot_object_distribution():
             subax.tick_params(color="white")
             num_group += 1
             im = subax.imshow(group, cmap=cmap)
-            im.set_clim(0, num_tier)
+            im.set_clim(0, 3)
             subax.yaxis.set_ticks([])
             subax.xaxis.set_ticks([])
         #divider = make_axes_locatable(subax)
@@ -163,39 +163,41 @@ def plot_object_distribution():
         ticks = [0, 1, 2, 3]
         fig.colorbar(cm.ScalarMappable(cmap=cmap, norm=mat_col.NoNorm()), format=fmt, ticks=ticks)
 
-        times = []
-        num_tiers = 0
-        for tier in current_timestep:
-            num_tiers += 1
-            resp_times = 0;
-            total = 0;
-            for o_id in tier["reqs"]:
-                resps = tier["reqs"][f"{o_id}"]
-                size = tier["files"][f"{o_id}"][1]
-                for resp in resps:
-                    total += 1
-                    resp_times += resp["response_time"]["nanos"] / size
-            if total != 0:
-                times.append(resp_times / total)
-            else:
-                times.append(0)
-        x_ticks = np.arange(0, num_tiers)
-        width = 0.35
-        # convert from nanos to millis
-        axs[3].bar(x_ticks, np.array(times) / 1000000, width, label='Access latency', hatch=['.', '+', '/'], color='white', edgecolor='black')
-        axs[3].set_title('Mean access latency for timestep')
-        axs[3].set_ylabel('Mean latency in ms')
-        #axs[3].set_ylim(0, 100)
-        axs[3].set_xticks(x_ticks, labels=["Fastest", "Fast", "Slow"])
+        # Plot response times if available
+        if 'reqs' in current_timestep[0]:
+            times = []
+            num_tiers = 0
+            for tier in current_timestep:
+                num_tiers += 1
+                resp_times = 0;
+                total = 0;
+                for o_id in tier["reqs"]:
+                    resps = tier["reqs"][f"{o_id}"]
+                    size = tier["files"][f"{o_id}"][1]
+                    for resp in resps:
+                        total += 1
+                        resp_times += resp["response_time"]["nanos"] / size
+                if total != 0:
+                    times.append(resp_times / total)
+                else:
+                    times.append(0)
+            x_ticks = np.arange(0, num_tiers)
+            width = 0.35
+            # convert from nanos to millis
+            axs[3].bar(x_ticks, np.array(times) / 1000000, width, label='Access latency', hatch=['.', '+', '/'], color='white', edgecolor='black')
+            axs[3].set_title('Mean access latency for timestep')
+            axs[3].set_ylabel('Mean latency in ms')
+            #axs[3].set_ylim(0, 100)
+            axs[3].set_xticks(x_ticks, labels=["Fastest", "Fast", "Slow"])
 
         fig.savefig(f"{sys.argv[1]}/plot_timestep_{num_ts:0>3}.png")
         matplotlib.pyplot.close(fig)
         num_ts += 1
 
     fig, ax = plt.subplots(figsize=(10,5))
-    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group");
-    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed");
-    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed");
+    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group", marker="o", markevery=20);
+    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed", marker="s", markevery=20);
+    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed", marker="^", markevery=20);
     # we might want to pick the actual timestamps for this
     ax.set_xlabel("Timestep")
     ax.set_ylabel("Mean object tier")
@@ -203,6 +205,40 @@ def plot_object_distribution():
     ax.set_ylim((1,3))
     pls_no_cut_off = ax.legend(bbox_to_anchor=(1.0,1.0), loc="upper left")
     fig.savefig(f"{sys.argv[1]}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
+
+def plot_tier_usage(data):
+    fig, axs = plt.subplots(4, 1, figsize=(9,13))
+
+    # 0 - 3; Fastest - Slowest
+    free = [[], [], [], []]
+    total = [[], [], [], []]
+    # Map each timestep to an individual
+    for ts in data:
+        tier = 0
+        for stat in ts["usage"]:
+            free[tier].append(stat["free"])
+            total[tier].append(stat["total"])
+            tier += 1
+
+    tier = 0
+    for fr in free:
+        match tier:
+            case 0:
+                axs[tier].set_title("Storage Utilization: Fastest")
+            case 1:
+                axs[tier].set_title("Storage Utilization: Fast")
+            case 2:
+                axs[tier].set_title("Storage Utilization: Slow")
+            case 3:
+                axs[tier].set_title("Storage Utilization: Slowest")
+        axs[tier].plot(np.array(fr) * 4096 / 1024 / 1024 / 1024, label="Free", marker="o", markevery=200)
+        axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200)
+        axs[tier].set_ylim(bottom=0)
+        axs[tier].legend(loc="lower center")
+        axs[tier].set_ylabel("Capacity in GiB")
+        tier += 1
+
+    fig.savefig(f"{sys.argv[1]}/tier_usage.svg")
 
 def read_jsonl(file):
     data = []
@@ -222,7 +258,6 @@ if len(sys.argv) < 2:
     exit(1)
 
 
-print("reading intiital data")
 fs = open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r')
 # print("{}".format(data))
 data = read_jsonl(fs)
@@ -230,5 +265,6 @@ fs.close()
 
 # Plot actions
 plot_throughput(data)
+plot_tier_usage(data)
 #plot_latency(data)
 plot_object_distribution()
