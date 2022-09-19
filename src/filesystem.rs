@@ -37,7 +37,7 @@ const SIZES: [u64; 5] = [
     1 * 1000 * 1000 * 1000,
 ];
 // Tuple describing the file distribution
-const TIERS_SPEC: [[usize; 5]; 3] = [
+const GROUPS_SPEC: [[usize; 5]; 3] = [
     [1022, 256, 1364, 1364, 24],
     [164, 40, 220, 220, 4],
     [12, 4, 16, 16, 2],
@@ -54,7 +54,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     for t_id in 0..3 {
         groups.push(vec![]);
         let objs = groups.last_mut().unwrap();
-        for (count, size) in TIERS_SPEC[t_id].iter().zip(SIZES.iter()) {
+        for (count, size) in GROUPS_SPEC[t_id].iter().zip(SIZES.iter()) {
             for _ in 0..*count {
                 let pref = pref(
                     client.rng.gen_range(TIERS),
@@ -128,12 +128,12 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
         .create(true)
         .open("filesystem_measurements.csv")?;
     let mut w = std::io::BufWriter::new(f);
-    w.write_all(b"key,size,read_latency_ns,write_latency_ns\n")?;
+    w.write_all(b"key,size,read_latency_ns,write_latency_ns,group\n")?;
 
-    for tier in TIERS {
+    for (n, _) in GROUPS_SPEC.iter().enumerate() {
         for (idx, sel_num) in SELECTION.iter().enumerate() {
-            let obj_num = TIERS_SPEC[tier as usize][idx];
-            let okstart = obj_key_start(tier as usize, idx);
+            let obj_num = GROUPS_SPEC[n][idx];
+            let okstart = obj_key_start(n, idx);
             let okend = okstart + obj_num;
             for _ in 0..*sel_num {
                 let obj_key = format!("key{}", client.rng.gen_range(okstart..=okend));
@@ -153,7 +153,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                 let write_time = start.elapsed();
                 w.write_all(
                     format!(
-                        "{obj_key},{size},{},{}\n",
+                        "{obj_key},{size},{},{},{n}\n",
                         read_time.as_nanos(),
                         write_time.as_nanos()
                     )
@@ -169,8 +169,8 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
 fn obj_key_start(tier: usize, group: usize) -> usize {
     let mut tier_offset = 0;
     for idx in 0..tier {
-        tier_offset += TIERS_SPEC[idx].iter().sum::<usize>();
+        tier_offset += GROUPS_SPEC[idx].iter().sum::<usize>();
     }
-    let group_offset = TIERS_SPEC[tier].iter().take(group).sum::<usize>();
+    let group_offset = GROUPS_SPEC[tier].iter().take(group).sum::<usize>();
     tier_offset + group_offset
 }
