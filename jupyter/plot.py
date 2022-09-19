@@ -27,10 +27,25 @@ def subtract_first_index(array):
     for index, value in enumerate(array):
         array[index] = value -first_val
 
+def num_to_name(tier):
+    match tier:
+        case 0:
+            return 'Fastest'
+        case 1:
+            return 'Fast'
+        case 2:
+            return 'Slow'
+        case 3:
+            return 'Slowest'
+        case _:
+            return '???'
+
 def plot_throughput(data):
     epoch = [temp['epoch_ms'] for temp in data]
     subtract_first_index(epoch)
-    fig, ax = plt.subplots(figsize=(15,5))
+    fig, axs = plt.subplots(4, 1, figsize=(16,8))
+    colors=['#009E73', '#F0E442', '#0072B2', '#D55E00']
+    markers=['o', '^', '']
     for x in range(4):
         for y in range(4):
             writes = np.array([])
@@ -51,20 +66,20 @@ def plot_throughput(data):
                 # if you change this you'll need to modify this here too.
                 writes = writes * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
                 reads = reads * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
+                write_line = axs[x].plot(epoch, writes, label = 'Written', color="#F0E442")
+                read_line = axs[x].plot(epoch, reads, label = 'Read', linestyle='dotted', color="#009E73")
 
-                ax.plot(epoch, writes, label = "Writes {}/{}".format(x,y))
-                ax.plot(epoch, reads, label = "Reads {}/{}".format(x,y))
-    fig.legend()
+            ms_to_string = lambda time: f"{int(time / 1000 / 60)}:{int(time / 1000) % 60:02d}"
+            epoch_formatted = list(map(ms_to_string, epoch))
+            axs[x].set_xlabel("runtime (minute:seconds)")  # add X-axis label
+            axs[x].set_xticks(epoch, epoch_formatted)
+            axs[x].locator_params(tight=True, nbins=10)
+
+            axs[x].set_ylabel(f"{num_to_name(x)}\nMiB/s (I/0)")  # add Y-axis label
+            label=' | '.join(sys.argv[1].split('/')[-2:])
+    fig.legend(loc="center right")
     # Epoch in seconds
-    ms_to_string = lambda time: f"{int(time / 1000 / 60)}:{int(time / 1000) % 60:02d}"
-    epoch_formatted = list(map(ms_to_string, epoch))
-    ax.set_xlabel("runtime (minute:seconds)")  # add X-axis label
-    ax.set_xticks(epoch, epoch_formatted)
-    ax.locator_params(tight=True, nbins=10)
-
-    ax.set_ylabel("MiB/s (I/0)")  # add Y-axis label
-    label=' | '.join(sys.argv[1].split('/')[-2:])
-    ax.set_title(f"Haura - {label}")  # add title
+    fig.suptitle(f"Haura - {label}", y=0.98)  # add title
     fig.savefig(f"{sys.argv[1]}/plot.svg")
 
 def plot_latency(data):
@@ -195,9 +210,9 @@ def plot_object_distribution():
         num_ts += 1
 
     fig, ax = plt.subplots(figsize=(10,5))
-    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group", marker="o", markevery=20);
-    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed", marker="s", markevery=20);
-    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed", marker="^", markevery=20);
+    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group", marker="o", markevery=10);
+    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed", marker="s", markevery=10);
+    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed", marker="^", markevery=10);
     # we might want to pick the actual timestamps for this
     ax.set_xlabel("Timestep")
     ax.set_ylabel("Mean object tier")
@@ -231,10 +246,10 @@ def plot_tier_usage(data):
                 axs[tier].set_title("Storage Utilization: Slow")
             case 3:
                 axs[tier].set_title("Storage Utilization: Slowest")
-        axs[tier].plot(np.array(fr) * 4096 / 1024 / 1024 / 1024, label="Free", marker="o", markevery=200)
+        axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200)
         axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200)
         axs[tier].set_ylim(bottom=0)
-        axs[tier].legend(loc="lower center")
+        axs[tier].legend(loc="upper center")
         axs[tier].set_ylabel("Capacity in GiB")
         tier += 1
 
