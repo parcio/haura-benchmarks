@@ -237,20 +237,11 @@ def plot_tier_usage(data):
 
     tier = 0
     for fr in free:
-        match tier:
-            case 0:
-                axs[tier].set_title("Storage Utilization: Fastest")
-            case 1:
-                axs[tier].set_title("Storage Utilization: Fast")
-            case 2:
-                axs[tier].set_title("Storage Utilization: Slow")
-            case 3:
-                axs[tier].set_title("Storage Utilization: Slowest")
         axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200)
         axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200)
         axs[tier].set_ylim(bottom=0)
         axs[tier].legend(loc="upper center")
-        axs[tier].set_ylabel("Capacity in GiB")
+        axs[tier].set_ylabel(f"{num_to_name(tier)}\nCapacity in GiB")
         tier += 1
 
     fig.savefig(f"{sys.argv[1]}/tier_usage.svg")
