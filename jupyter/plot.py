@@ -15,6 +15,16 @@ BLOCK_SIZE = 4096
 EPOCH_MS=500
 SEC_MS=1000
 
+
+# For color reference of "Wong" color scheme see:
+# https://davidmathlogic.com/colorblind/#%23000000-%23E69F00-%2356B4E9-%23009E73-%23F0E442-%230072B2-%23D55E00-%23CC79A7
+GREEN='#009E73'
+YELLOW='#F0E442'
+BLUE='#0072B2'
+LIGHT_BLUE='#56B4E9'
+RED='#D55E00'
+ORANGE='#E69F00'
+
 def subtract_last_index(array):
     last_val = 0
     for index, value in enumerate(array):
@@ -44,7 +54,7 @@ def plot_throughput(data):
     epoch = [temp['epoch_ms'] for temp in data]
     subtract_first_index(epoch)
     fig, axs = plt.subplots(4, 1, figsize=(16,8))
-    colors=['#009E73', '#F0E442', '#0072B2', '#D55E00']
+    colors=[GREEN, YELLOW, BLUE, RED]
     markers=['o', '^', '']
     for x in range(4):
         for y in range(4):
@@ -66,8 +76,8 @@ def plot_throughput(data):
                 # if you change this you'll need to modify this here too.
                 writes = writes * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
                 reads = reads * BLOCK_SIZE / 1024 / 1024 * (SEC_MS / EPOCH_MS)
-                write_line = axs[x].plot(epoch, writes, label = 'Written', color="#F0E442")
-                read_line = axs[x].plot(epoch, reads, label = 'Read', linestyle='dotted', color="#009E73")
+                axs[x].plot(epoch, reads, label = 'Read', linestyle='dotted', color=GREEN)
+                axs[x].plot(epoch, writes, label = 'Written', color=BLUE)
 
             ms_to_string = lambda time: f"{int(time / 1000 / 60)}:{int(time / 1000) % 60:02d}"
             epoch_formatted = list(map(ms_to_string, epoch))
@@ -80,7 +90,16 @@ def plot_throughput(data):
     fig.legend(loc="center right")
     # Epoch in seconds
     fig.suptitle(f"Haura - {label}", y=0.98)  # add title
-    fig.savefig(f"{sys.argv[1]}/plot.svg")
+    fig.savefig(f"{sys.argv[1]}/plot_write.svg")
+    for x in range(4):
+        lines = axs[x].get_lines()
+        if len(lines) > 0:
+            lines[0].set_linestyle('solid')
+            lines[0].zorder = 2.0
+            lines[1].set_linestyle('dotted')
+            lines[1].zorder = 2.1
+    fig.legend(loc="center right")
+    fig.savefig(f"{sys.argv[1]}/plot_read.svg")
 
 def plot_latency(data):
     epoch = [temp['epoch_ms'] for temp in data]
@@ -124,9 +143,9 @@ def plot_object_distribution():
     fs.close()
     colors = {
         0: "white",
-        1: "#009E73",
-        2: "#F0E442",
-        3: "#0072B2",
+        1: GREEN,
+        2: YELLOW,
+        3: BLUE,
     }    
     cmap = mat_col.ListedColormap([colors[x] for x in colors.keys()])
     labels = np.array(["Not present", "Fastest", "Fast", "Slow"])
@@ -210,9 +229,9 @@ def plot_object_distribution():
         num_ts += 1
 
     fig, ax = plt.subplots(figsize=(10,5))
-    ax.plot(mean_group_vals[0], color='#E69F00', label="Seldomly Accessed Group", marker="o", markevery=10);
-    ax.plot(mean_group_vals[1], color='#56B4E9', label="Occassionally Accessed", marker="s", markevery=10);
-    ax.plot(mean_group_vals[2], color='#D55E00', label="Often Accessed", marker="^", markevery=10);
+    ax.plot(mean_group_vals[0], color=ORANGE, label="Seldomly Accessed Group", marker="o", markevery=10);
+    ax.plot(mean_group_vals[1], color=LIGHT_BLUE, label="Occassionally Accessed", marker="s", markevery=10);
+    ax.plot(mean_group_vals[2], color=RED, label="Often Accessed", marker="^", markevery=10);
     # we might want to pick the actual timestamps for this
     ax.set_xlabel("Timestep")
     ax.set_ylabel("Mean object tier")
@@ -237,8 +256,8 @@ def plot_tier_usage(data):
 
     tier = 0
     for fr in free:
-        axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200)
-        axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200)
+        axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200, color=BLUE)
+        axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200, color=GREEN)
         axs[tier].set_ylim(bottom=0)
         axs[tier].legend(loc="upper center")
         axs[tier].set_ylabel(f"{num_to_name(tier)}\nCapacity in GiB")
@@ -316,7 +335,6 @@ def plot_filesystem_test():
         axs[1][n].set_ylabel("Write latency (μs)")
 
     for n in range(3):
-        print(min(min_read, min_write))
         axs[0][n].set_ylim(min(min_read, min_write),max_read + 10000000)
         axs[1][n].set_ylim(min(min_read, min_write),max_write + 10000000)
 
@@ -347,8 +365,8 @@ data = read_jsonl(fs)
 fs.close()
 
 # Plot actions
-plot_filesystem_test()
 plot_throughput(data)
 plot_tier_usage(data)
 #plot_latency(data)
 plot_object_distribution()
+plot_filesystem_test()
