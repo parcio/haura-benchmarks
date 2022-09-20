@@ -246,6 +246,83 @@ def plot_tier_usage(data):
 
     fig.savefig(f"{sys.argv[1]}/tier_usage.svg")
 
+# TODO: Adjust bucket sizes
+def size_buckets(byte):
+    if byte <= 64000:
+        return 64000
+    elif byte <= 256000:
+        return 256000
+    elif byte <= 1000000:
+        return 1000000
+    elif byte <= 4000000:
+        return 4000000
+    else:
+        return 1000000000
+
+def bytes_to_lexical(byte):
+    if byte >= 1000000:
+        return f"{byte/1000/1000}MB"
+    return f"{byte/1000}KB"
+
+def plot_filesystem_test():
+    dat = pd.read_csv(f"{sys.argv[1]}/filesystem_measurements.csv")
+    # groups
+    fig, axs = plt.subplots(2,3, figsize=(15,5))
+    min_read = 99999999999999999
+    min_write = 99999999999999999
+    max_read = 0
+    max_write = 0
+    for n in range(3):
+        sizes = dat[dat['group'] == n]['size'].to_numpy()
+        reads = {}
+        reads_raw = dat[dat['group'] == n]['read_latency_ns'].to_numpy()
+        writes = {}
+        writes_raw = dat[dat['group'] == n]['write_latency_ns'].to_numpy()
+        for (idx, size) in enumerate(sizes):
+            if size_buckets(size) not in reads:
+                reads[size_buckets(size)] = []
+            reads[size_buckets(size)].append(reads_raw[idx])
+            if size_buckets(size) not in writes:
+                writes[size_buckets(size)] = []
+            writes[size_buckets(size)].append(writes_raw[idx])
+
+        sorted_sizes = list(reads)
+        sorted_sizes.sort()
+        labels = []
+        reads_plot = []
+        writes_plot = []
+        for size in sorted_sizes:
+            labels.append(bytes_to_lexical(size))
+            a = np.array(reads[size]) / 1000
+            min_read = min(min_read, a.min())
+            max_read = max(max_read, a.max())
+            reads_plot.append(a)
+            b = np.array(writes[size]) / 1000
+            min_write = min(min_write, b.min())
+            max_write = max(max_write, b.max())
+            writes_plot.append(b)
+        axs[0][n].boxplot(reads_plot, vert=True, labels=labels)
+        axs[0][n].set_yscale('log')
+        match n:
+            case 0:
+                axs[0][n].set_title("Seldomly Accessed")
+            case 1:
+                axs[0][n].set_title("Occassionally Accessed")
+            case 2:
+                axs[0][n].set_title("Often Accessed")
+        axs[0][n].set_ylabel("Read latency (μs)")
+        axs[1][n].boxplot(writes_plot, vert=True, labels=labels)
+        axs[1][n].set_yscale('log')
+        axs[1][n].set_ylabel("Write latency (μs)")
+
+    for n in range(3):
+        print(min(min_read, min_write))
+        axs[0][n].set_ylim(min(min_read, min_write),max_read + 10000000)
+        axs[1][n].set_ylim(min(min_read, min_write),max_write + 10000000)
+
+    fig.savefig(f"{sys.argv[1]}/filesystem_comp.svg")
+
+
 def read_jsonl(file):
     data = []
     while True:
@@ -270,6 +347,7 @@ data = read_jsonl(fs)
 fs.close()
 
 # Plot actions
+plot_filesystem_test()
 plot_throughput(data)
 plot_tier_usage(data)
 #plot_latency(data)
