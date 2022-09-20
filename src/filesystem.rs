@@ -101,27 +101,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     // pick certain files which we know are in range, here we pick 3x64KB, 3x256KB, 3x1MB, 3x4MB, 1x1GB
     // Read individual files multiple times to see the cache working?
     const SELECTION: [usize; 5] = [3, 3, 3, 3, 1];
-
-    {
-        // Thrash Cache by writing random data into slow with a different object store
-        println!("destroying cache");
-        let os = client
-            .database
-            .write()
-            .open_named_object_store(b"destroycache", StoragePreference::SLOW)?;
-        let obj = os.create_object(b"foo")?;
-        let mut cursor = obj.cursor_with_pref(StoragePreference::SLOW);
-        with_random_bytes(
-            &mut client.rng,
-            1 * 1024 * 1024 * 1024,
-            8 * 1024 * 1024,
-            |b| cursor.write_all(b),
-        )?;
-        println!("sync db");
-        client.sync().expect("Failed to sync database");
-        // Cooldown
-        std::thread::sleep(std::time::Duration::from_secs(30));
-    }
+    thrash_cache(&mut client)?;
     println!("start measuring");
     let f = std::fs::OpenOptions::new()
         .write(true)
@@ -159,6 +139,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     )
                     .as_bytes(),
                 )?;
+                thrash_cache(&mut client)?;
             }
         }
     }
@@ -173,4 +154,26 @@ fn obj_key_start(tier: usize, group: usize) -> usize {
     }
     let group_offset = GROUPS_SPEC[tier].iter().take(group).sum::<usize>();
     tier_offset + group_offset
+}
+
+pub(crate) fn thrash_cache(client: &mut Client) -> Result<(), Box<dyn Error>> {
+    // Thrash Cache by writing random data into slow with a different object store
+    println!("destroying cache");
+    let os = client
+        .database
+        .write()
+        .open_named_object_store(b"destroycache", StoragePreference::SLOW)?;
+    let obj = os.open_or_create_object(b"foo")?;
+    let mut cursor = obj.cursor_with_pref(StoragePreference::SLOW);
+    with_random_bytes(
+        &mut client.rng,
+        1 * 1024 * 1024 * 1024,
+        8 * 1024 * 1024,
+        |b| cursor.write_all(b),
+    )?;
+    println!("sync db");
+    client.sync().expect("Failed to sync database");
+    // Cooldown
+    std::thread::sleep(std::time::Duration::from_secs(30));
+    Ok(())
 }

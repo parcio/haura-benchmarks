@@ -7,6 +7,7 @@ use rand::{
     thread_rng, Rng, seq::{IteratorRandom, SliceRandom},
 };
 use std::{error::Error, io::{Write, Read}, ops::Range, path::Path};
+use crate::filesystem::thrash_cache;
 
 fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
     let space = client.database.read().free_space_tier();
@@ -31,7 +32,7 @@ const PROBS: [f64; 3] = [0.01, 0.2, 0.9];
 const TIERS: Range<u8> = 0..3;
 
 const GROUPS: [f32; 3] = [0.8, 0.15, 0.05];
-const NUM_SAMPLE: usize = 20;
+const NUM_SAMPLE: usize = 50;
 
 pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     println!("running filesystem");
@@ -100,27 +101,6 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
     // // pick certain files which we know are in range, here we pick 3x64KB, 3x256KB, 3x1MB, 3x4MB, 1x1GB
     // // Read individual files multiple times to see the cache working?
     // const SELECTION: [usize; 5] = [3, 3, 3, 3, 1];
-
-    {
-        // Thrash Cache by writing random data into slow with a different object store
-        println!("destroying cache");
-        let os = client
-            .database
-            .write()
-            .open_named_object_store(b"destroycache", StoragePreference::SLOW)?;
-        let obj = os.create_object(b"foo")?;
-        let mut cursor = obj.cursor_with_pref(StoragePreference::SLOW);
-        with_random_bytes(
-            &mut client.rng,
-            1 * 1024 * 1024 * 1024,
-            8 * 1024 * 1024,
-            |b| cursor.write_all(b),
-        )?;
-        println!("sync db");
-        client.sync().expect("Failed to sync database");
-        // Cooldown
-        std::thread::sleep(std::time::Duration::from_secs(30));
-    }
     println!("start measuring");
     let f = std::fs::OpenOptions::new()
         .write(true)
@@ -131,6 +111,7 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
 
     for (idx, sampler) in groups.iter().enumerate() {
             for _ in 0..NUM_SAMPLE {
+                thrash_cache(&mut client)?;
                 let (obj_key, size) = sampler.choose(&mut client.rng).unwrap();
                 let obj = client
                     .object_store
