@@ -171,10 +171,10 @@ pub(crate) fn thrash_cache(client: &mut Client) -> Result<(), Box<dyn Error>> {
         8 * 1024 * 1024,
         |b| cursor.write_all(b),
     )?;
+    client.database.write().close_object_store(os);
     println!("sync db");
     client.sync().expect("Failed to sync database");
     // Cooldown
-    client.database.write().close_object_store(os);
     std::thread::sleep(std::time::Duration::from_secs(30));
     Ok(())
 }
