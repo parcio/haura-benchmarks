@@ -4,10 +4,9 @@ use betree_storage_stack::vdev::Block;
 use betree_storage_stack::StoragePreference;
 use rand::{
     distributions::{DistIter, Slice},
-    thread_rng, Rng, seq::{IteratorRandom, SliceRandom},
+    thread_rng, Rng, seq::SliceRandom,
 };
 use std::{error::Error, io::{Write, Read}, ops::Range, path::Path};
-use crate::filesystem::thrash_cache;
 
 fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
     let space = client.database.read().free_space_tier();
@@ -111,7 +110,7 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
 
     for (idx, sampler) in groups.iter().enumerate() {
             for _ in 0..NUM_SAMPLE {
-                thrash_cache(&mut client)?;
+                client.database.read().clear_cache();
                 let (obj_key, size) = sampler.choose(&mut client.rng).unwrap();
                 let obj = client
                     .object_store

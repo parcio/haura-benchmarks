@@ -101,7 +101,6 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
     // pick certain files which we know are in range, here we pick 3x64KB, 3x256KB, 3x1MB, 3x4MB, 1x1GB
     // Read individual files multiple times to see the cache working?
     const SELECTION: [usize; 5] = [3, 3, 3, 3, 1];
-    thrash_cache(&mut client)?;
     println!("start measuring");
     let f = std::fs::OpenOptions::new()
         .write(true)
@@ -116,6 +115,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             let okstart = obj_key_start(n, idx);
             let okend = okstart + obj_num;
             for _ in 0..*sel_num {
+                client.database.read().clear_cache();
                 let obj_key = format!("key{}", client.rng.gen_range(okstart..=okend));
                 let obj = client
                     .object_store
@@ -139,7 +139,6 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     )
                     .as_bytes(),
                 )?;
-                thrash_cache(&mut client)?;
             }
         }
     }
