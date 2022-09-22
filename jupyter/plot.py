@@ -87,7 +87,7 @@ def plot_throughput(data):
 
             axs[x].set_ylabel(f"{num_to_name(x)}\nMiB/s (I/0)")  # add Y-axis label
             label=' | '.join(sys.argv[1].split('/')[-2:])
-    fig.legend(loc="center right")
+    fig.legend(loc="center right",handles=axs[0].get_lines())
     # Epoch in seconds
     fig.suptitle(f"Haura - {label}", y=0.98)  # add title
     fig.savefig(f"{sys.argv[1]}/plot_write.svg")
@@ -95,10 +95,10 @@ def plot_throughput(data):
         lines = axs[x].get_lines()
         if len(lines) > 0:
             lines[0].set_linestyle('solid')
-            lines[0].zorder = 2.0
+            lines[0].zorder = 2.1
             lines[1].set_linestyle('dotted')
-            lines[1].zorder = 2.1
-    fig.legend(loc="center right")
+            lines[1].zorder = 2.0
+    fig.legend(loc="center right",handles=axs[0].get_lines())
     fig.savefig(f"{sys.argv[1]}/plot_read.svg")
 
 def plot_latency(data):
@@ -241,7 +241,7 @@ def plot_object_distribution():
     fig.savefig(f"{sys.argv[1]}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
 
 def plot_tier_usage(data):
-    fig, axs = plt.subplots(4, 1, figsize=(9,13))
+    fig, axs = plt.subplots(4, 1, figsize=(10,13))
 
     # 0 - 3; Fastest - Slowest
     free = [[], [], [], []]
@@ -259,10 +259,10 @@ def plot_tier_usage(data):
         axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200, color=BLUE)
         axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200, color=GREEN)
         axs[tier].set_ylim(bottom=0)
-        axs[tier].legend(loc="upper center")
         axs[tier].set_ylabel(f"{num_to_name(tier)}\nCapacity in GiB")
         tier += 1
 
+    fig.legend(loc='center right',handles=axs[0].get_lines())
     fig.savefig(f"{sys.argv[1]}/tier_usage.svg")
 
 # TODO: Adjust bucket sizes
