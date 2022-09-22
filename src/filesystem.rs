@@ -139,6 +139,9 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     )
                     .as_bytes(),
                 )?;
+                client.sync();
+                client.database.read().clear_cache();
+                std::thread::sleep(std::time::Duration::from_secs(20));
             }
         }
     }
