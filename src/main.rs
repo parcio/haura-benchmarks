@@ -5,6 +5,7 @@ use structopt::StructOpt;
 
 mod checkpoints;
 mod filesystem;
+mod filesystem_zip;
 mod ingest;
 mod rewrite;
 mod scientific_evaluation;
@@ -20,7 +21,14 @@ enum Mode {
     Tiered1,
     Checkpoints,
     Filesystem,
-    Evaluation {
+    FilesystemZip {
+        path: PathBuf
+    },
+    EvaluationRead {
+        #[structopt(default_value = "120")]
+        runtime: u64,
+    },
+    EvaluationRW {
         #[structopt(default_value = "120")]
         runtime: u64,
     },
@@ -70,9 +78,19 @@ fn run_all(mode: Mode) -> Result<(), Box<dyn Error>> {
             filesystem::run(client)?;
             control.database.write().sync()?;
         }
-        Mode::Evaluation { runtime } => {
+        Mode::FilesystemZip { path } => {
+            let client = control.client(0, b"filesystem_zip");
+            filesystem_zip::run(client, path)?;
+            control.database.write().sync()?;
+        }
+        Mode::EvaluationRead { runtime } => {
             let client = control.client(0, b"scientific_evaluation");
-            scientific_evaluation::run(client, runtime)?;
+            scientific_evaluation::run_read(client, runtime)?;
+            control.database.write().sync()?;
+        }
+        Mode::EvaluationRW { runtime } => {
+            let client = control.client(0, b"scientific_evaluation");
+            scientific_evaluation::run_read_write(client, runtime)?;
             control.database.write().sync()?;
         }
         Mode::Zip {

@@ -58,9 +58,7 @@ impl Control {
 
         let database = Database::build_threaded(cfg).expect("Failed to open database");
 
-        Control {
-            database,
-        }
+        Control { database }
     }
 
     pub fn new() -> Self {
