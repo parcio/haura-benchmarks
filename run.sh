@@ -110,7 +110,17 @@ function scientific_evaluation() {
   #local vdev_type="ssd"
   #local vdev_type="pmem_fs"
   export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
-  run "$vdev_type" scientific_evaluation_id_alloc evaluation 30
+  run "$vdev_type" scientific_evaluation_id_alloc evaluation-read 30
+}
+
+function evaluation_rw() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
+  run "$vdev_type" file_system_three evaluation-rw
+}
+
+function filesystem_zip() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[2],[]]'
+  run "$vdev_type" file_system_three filesystem-zip data/archive.zip
 }
 
 function checkpoints() {
