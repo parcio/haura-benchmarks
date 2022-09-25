@@ -110,7 +110,7 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
 
     for (idx, sampler) in groups.iter().enumerate() {
             for _ in 0..NUM_SAMPLE {
-                client.database.read().clear_cache();
+                client.database.read().clear_cache()?;
                 let (obj_key, size) = sampler.choose(&mut client.rng).unwrap();
                 let obj = client
                     .object_store
@@ -133,6 +133,9 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
                     )
                     .as_bytes(),
                 )?;
+                client.sync()?;
+                client.database.read().clear_cache()?;
+                std::thread::sleep(std::time::Duration::from_secs(10));
             }
     }
     w.flush()?;

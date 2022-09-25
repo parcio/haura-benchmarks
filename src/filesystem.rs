@@ -115,7 +115,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             let okstart = obj_key_start(n, idx);
             let okend = okstart + obj_num;
             for _ in 0..*sel_num {
-                client.database.read().clear_cache();
+                client.database.read().clear_cache()?;
                 let obj_key = format!("key{}", client.rng.gen_range(okstart..=okend));
                 let obj = client
                     .object_store
@@ -139,8 +139,8 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     )
                     .as_bytes(),
                 )?;
-                client.sync();
-                client.database.read().clear_cache();
+                client.sync()?;
+                client.database.read().clear_cache()?;
                 std::thread::sleep(std::time::Duration::from_secs(20));
             }
         }
