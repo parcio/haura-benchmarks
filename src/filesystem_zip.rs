@@ -67,8 +67,8 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
     // Create groups
     let mut groups: [Vec<(String, u64)>; 3] = [0;3].map(|_| vec![]);
     let mut distributed = 0usize;
+    file_name_with_size.shuffle(&mut client.rng);
     for (id, part) in GROUPS.iter().enumerate() {
-        file_name_with_size.shuffle(&mut client.rng);
         let num = (part * file_num as f32) as usize;
         groups[id] = file_name_with_size[distributed..(distributed+num)].to_vec();
         distributed += num;
@@ -135,7 +135,7 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
                 )?;
                 client.sync()?;
                 client.database.read().clear_cache()?;
-                std::thread::sleep(std::time::Duration::from_secs(10));
+                std::thread::sleep(std::time::Duration::from_secs(5));
             }
     }
     w.flush()?;
