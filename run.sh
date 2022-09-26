@@ -119,8 +119,9 @@ function evaluation_rw() {
 }
 
 function filesystem_zip() {
+  local path="$PWD/data/archive.zip"
   export BETREE__ALLOC_STRATEGY='[[0],[1],[2],[]]'
-  run "$vdev_type" file_system_three filesystem-zip data/archive.zip
+  run "$vdev_type" file_system_three "$path"
 }
 
 function checkpoints() {
@@ -259,8 +260,9 @@ ensure_bectl
 
 #zip_tiered
 #tiered
-scientific_evaluation
+#scientific_evaluation
 #filesystem
+filesystem_zip
 #checkpoints
 #(
   # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
