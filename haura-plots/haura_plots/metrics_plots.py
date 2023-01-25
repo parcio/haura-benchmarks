@@ -1,7 +1,7 @@
 """
 Plots visualizing the metrics produced by Haura.
 """
-import util
+from . import util
 import numpy as np
 import matplotlib.pyplot as plt
 

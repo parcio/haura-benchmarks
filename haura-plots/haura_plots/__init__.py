@@ -10,8 +10,8 @@ import matplotlib.cm as cm
 import matplotlib.colors as mat_col
 import matplotlib
 
-import util
-import metrics_plots
+from . import util
+from . import metrics_plots
 
 # def plot_latency(data):
 #     epoch = [temp['epoch_ms'] for temp in data]
@@ -261,14 +261,14 @@ def plot_filesystem_test():
     fig.savefig(f"{sys.argv[1]}/filesystem_comp.svg")
 
 
-USAGE_HELP="""Please specify an input run directory. If you already completed\
+USAGE_HELP="""Please specify an input run directory. If you already completed \
 benchmarks they can be found under `results/*`.
 
 Usage:
     haura-plots <path/to/benchmark>
 """
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 2:
         print(USAGE_HELP)
         sys.exit(2)
@@ -282,3 +282,6 @@ if __name__ == "__main__":
     #plot_latency(data)
     plot_object_distribution()
     plot_filesystem_test()
+
+if __name__ == "__main__":
+    main()
