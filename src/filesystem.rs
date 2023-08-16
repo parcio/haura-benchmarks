@@ -115,7 +115,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
             let okstart = obj_key_start(n, idx);
             let okend = okstart + obj_num;
             for _ in 0..*sel_num {
-                client.database.read().clear_cache()?;
+                client.database.read().drop_cache()?;
                 let obj_key = format!("key{}", client.rng.gen_range(okstart..=okend));
                 let obj = client
                     .object_store
@@ -140,7 +140,7 @@ pub fn run(mut client: Client) -> Result<(), Box<dyn Error>> {
                     .as_bytes(),
                 )?;
                 client.sync()?;
-                client.database.read().clear_cache()?;
+                client.database.read().drop_cache()?;
                 std::thread::sleep(std::time::Duration::from_secs(20));
             }
         }
@@ -156,27 +156,4 @@ fn obj_key_start(tier: usize, group: usize) -> usize {
     }
     let group_offset = GROUPS_SPEC[tier].iter().take(group).sum::<usize>();
     tier_offset + group_offset
-}
-
-pub(crate) fn thrash_cache(client: &mut Client) -> Result<(), Box<dyn Error>> {
-    // Thrash Cache by writing random data into slow with a different object store
-    println!("destroying cache");
-    let os = client
-        .database
-        .write()
-        .open_named_object_store(b"destroycache", StoragePreference::SLOW)?;
-    let obj = os.open_or_create_object(b"foo")?;
-    let mut cursor = obj.cursor_with_pref(StoragePreference::SLOW);
-    with_random_bytes(
-        &mut client.rng,
-        1 * 1024 * 1024 * 1024,
-        8 * 1024 * 1024,
-        |b| cursor.write_all(b),
-    )?;
-    client.database.write().close_object_store(os);
-    println!("sync db");
-    client.sync().expect("Failed to sync database");
-    // Cooldown
-    std::thread::sleep(std::time::Duration::from_secs(30));
-    Ok(())
 }

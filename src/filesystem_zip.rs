@@ -4,9 +4,15 @@ use betree_storage_stack::vdev::Block;
 use betree_storage_stack::StoragePreference;
 use rand::{
     distributions::{DistIter, Slice},
-    thread_rng, Rng, seq::SliceRandom,
+    seq::SliceRandom,
+    thread_rng, Rng,
 };
-use std::{error::Error, io::{Write, Read}, ops::Range, path::Path};
+use std::{
+    error::Error,
+    io::{Read, Write},
+    ops::Range,
+    path::Path,
+};
 
 fn pref(foo: u8, size: Block<u64>, client: &Client) -> StoragePreference {
     let space = client.database.read().free_space_tier();
@@ -45,7 +51,10 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
 
     // use expandable vector
     let mut buf = Vec::new();
-    let file_names = zip.file_names().map(|n| n.to_string()).collect::<Vec<String>>();
+    let file_names = zip
+        .file_names()
+        .map(|n| n.to_string())
+        .collect::<Vec<String>>();
     let mut file_name_with_size = vec![];
     let file_num = file_names.len();
     for file in file_names.into_iter() {
@@ -58,19 +67,21 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
             Block::from_bytes(size),
             &client,
         );
-        let (obj, _) = client.object_store.open_or_create_object_with_pref(file.as_bytes(), pref)?;
+        let (obj, _) = client
+            .object_store
+            .open_or_create_object_with_pref(file.as_bytes(), pref)?;
         obj.write_at_with_pref(&buf, 0, pref).map_err(|e| e.1)?;
-        file_name_with_size.push((file,size));
+        file_name_with_size.push((file, size));
         buf.clear();
     }
 
     // Create groups
-    let mut groups: [Vec<(String, u64)>; 3] = [0;3].map(|_| vec![]);
+    let mut groups: [Vec<(String, u64)>; 3] = [0; 3].map(|_| vec![]);
     let mut distributed = 0usize;
     file_name_with_size.shuffle(&mut client.rng);
     for (id, part) in GROUPS.iter().enumerate() {
         let num = (part * file_num as f32) as usize;
-        groups[id] = file_name_with_size[distributed..(distributed+num)].to_vec();
+        groups[id] = file_name_with_size[distributed..(distributed + num)].to_vec();
         distributed += num;
     }
 
@@ -109,34 +120,34 @@ pub fn run(mut client: Client, zip_path: impl AsRef<Path>) -> Result<(), Box<dyn
     w.write_all(b"key,size,read_latency_ns,write_latency_ns,group\n")?;
 
     for (idx, sampler) in groups.iter().enumerate() {
-            for _ in 0..NUM_SAMPLE {
-                client.database.read().clear_cache()?;
-                let (obj_key, size) = sampler.choose(&mut client.rng).unwrap();
-                let obj = client
-                    .object_store
-                    .open_object(obj_key.as_bytes())?
-                    .expect("Known object could not be opened");
-                let start = std::time::Instant::now();
-                obj.read_at(&mut buf, 0).map_err(|e| e.1)?;
-                let read_time = start.elapsed();
-                let mut cursor = obj.cursor();
-                let start = std::time::Instant::now();
-                with_random_bytes(&mut client.rng, *size, 8 * 1024 * 1024, |b| {
-                    cursor.write_all(b)
-                })?;
-                let write_time = start.elapsed();
-                w.write_all(
-                    format!(
-                        "{obj_key},{size},{},{},{idx}\n",
-                        read_time.as_nanos(),
-                        write_time.as_nanos()
-                    )
-                    .as_bytes(),
-                )?;
-                client.sync()?;
-                client.database.read().clear_cache()?;
-                std::thread::sleep(std::time::Duration::from_secs(5));
-            }
+        for _ in 0..NUM_SAMPLE {
+            client.database.read().drop_cache()?;
+            let (obj_key, size) = sampler.choose(&mut client.rng).unwrap();
+            let obj = client
+                .object_store
+                .open_object(obj_key.as_bytes())?
+                .expect("Known object could not be opened");
+            let start = std::time::Instant::now();
+            obj.read_at(&mut buf, 0).map_err(|e| e.1)?;
+            let read_time = start.elapsed();
+            let mut cursor = obj.cursor();
+            let start = std::time::Instant::now();
+            with_random_bytes(&mut client.rng, *size, 8 * 1024 * 1024, |b| {
+                cursor.write_all(b)
+            })?;
+            let write_time = start.elapsed();
+            w.write_all(
+                format!(
+                    "{obj_key},{size},{},{},{idx}\n",
+                    read_time.as_nanos(),
+                    write_time.as_nanos()
+                )
+                .as_bytes(),
+            )?;
+            client.sync()?;
+            client.database.read().drop_cache()?;
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
     }
     w.flush()?;
     Ok(())
