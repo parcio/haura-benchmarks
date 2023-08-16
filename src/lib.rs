@@ -21,9 +21,9 @@ use rand_xoshiro::Xoshiro256Plus;
 
 pub mod bufreader;
 
-pub type Database = database::Database<DatabaseConfiguration>;
-pub type Dataset = database::Dataset<DatabaseConfiguration>;
-pub type ObjectStore = object::ObjectStore<DatabaseConfiguration>;
+pub type Database = database::Database;
+pub type Dataset = database::Dataset;
+pub type ObjectStore = object::ObjectStore;
 
 pub struct Control {
     pub database: Arc<RwLock<Database>>,
