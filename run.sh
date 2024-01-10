@@ -5,7 +5,7 @@ function ensure_zip {
   local url
   url="https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.58.tar.xz"
 
-  if [ ! -e "$PWD/data/linux.zip" ]
+  if [ ! -e "$ZIP_ARCHIVE" ]
   then
     mkdir data
     pushd data || exit
