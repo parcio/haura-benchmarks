@@ -176,10 +176,10 @@ def plot_tier_usage(data):
 
     tier = 0
     for fr in free:
-        axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200, color=BLUE)
-        axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200, color=GREEN)
+        axs[tier].plot((np.array(total[tier]) - np.array(fr)) * 4096 / 1024 / 1024 / 1024, label="Used", marker="o", markevery=200, color=util.BLUE)
+        axs[tier].plot(np.array(total[tier]) * 4096 / 1024 / 1024 / 1024, label="Total", marker="^", markevery=200, color=util.GREEN)
         axs[tier].set_ylim(bottom=0)
-        axs[tier].set_ylabel(f"{num_to_name(tier)}\nCapacity in GiB")
+        axs[tier].set_ylabel(f"{util.num_to_name(tier)}\nCapacity in GiB")
         tier += 1
 
     fig.legend(loc='center right',handles=axs[0].get_lines())
@@ -204,60 +204,38 @@ def bytes_to_lexical(byte):
     return f"{byte/1000}KB"
 
 def plot_filesystem_test():
-    dat = pd.read_csv(f"{sys.argv[1]}/filesystem_measurements.csv")
+    dats = [(pd.read_csv(f"{sys.argv[1]}/zip-no.csv"), 'x', 'No Policy'),
+            (pd.read_csv(f"{sys.argv[1]}/zip-lfu.csv"), 'o', 'LFU'),
+            (pd.read_csv(f"{sys.argv[1]}/zip-rl.csv"), 's', 'RL')]
     # groups
     fig, axs = plt.subplots(2,3, figsize=(15,5))
     min_read = 99999999999999999
     min_write = 99999999999999999
     max_read = 0
     max_write = 0
-    for n in range(3):
-        sizes = dat[dat['group'] == n]['size'].to_numpy()
-        reads = {}
-        reads_raw = dat[dat['group'] == n]['read_latency_ns'].to_numpy()
-        writes = {}
-        writes_raw = dat[dat['group'] == n]['write_latency_ns'].to_numpy()
-        for (idx, size) in enumerate(sizes):
-            if size_buckets(size) not in reads:
-                reads[size_buckets(size)] = []
-            reads[size_buckets(size)].append(reads_raw[idx])
-            if size_buckets(size) not in writes:
-                writes[size_buckets(size)] = []
-            writes[size_buckets(size)].append(writes_raw[idx])
-
-        sorted_sizes = list(reads)
-        sorted_sizes.sort()
-        labels = []
-        reads_plot = []
-        writes_plot = []
-        for size in sorted_sizes:
-            labels.append(bytes_to_lexical(size))
-            a = np.array(reads[size]) / 1000
-            min_read = min(min_read, a.min())
-            max_read = max(max_read, a.max())
-            reads_plot.append(a)
-            b = np.array(writes[size]) / 1000
-            min_write = min(min_write, b.min())
-            max_write = max(max_write, b.max())
-            writes_plot.append(b)
-        axs[0][n].boxplot(reads_plot, vert=True, labels=labels)
-        axs[0][n].set_yscale('log')
-        match n:
-            case 0:
-                axs[0][n].set_title("Seldomly Accessed")
-            case 1:
-                axs[0][n].set_title("Occassionally Accessed")
-            case 2:
-                axs[0][n].set_title("Often Accessed")
-        axs[0][n].set_ylabel("Read latency (μs)")
-        axs[1][n].boxplot(writes_plot, vert=True, labels=labels)
-        axs[1][n].set_yscale('log')
-        axs[1][n].set_ylabel("Write latency (μs)")
+    foo = [0,0,0]
+    for (i, (dat, m, l)) in enumerate(dats):
+        for n in range(3):
+            sizes = dat[dat['group'] == n]['size'].to_numpy()
+            reads_raw = dat[dat['group'] == n]['read_latency_ns'].to_numpy() * 10**-3
+            writes_raw = dat[dat['group'] == n]['write_latency_ns'].to_numpy() * 10**-3
+            min_read = min(np.min(reads_raw), min_read)
+            min_write = min(np.min(writes_raw), min_read)
+            max_read = max(np.max(reads_raw), max_read)
+            max_write = max(np.max(writes_raw), max_read)
+            foo[i] = axs[0][n].scatter(sizes, reads_raw, marker=m, label=l)
+            axs[0][n].set_yscale('log')
+            axs[0][n].set_xscale('log')
+            axs[0][n].set_ylabel("Read latency (μs)")
+            axs[1][n].scatter(sizes, writes_raw, marker=m, label=l)
+            axs[1][n].set_yscale('log')
+            axs[1][n].set_xscale('log')
+            axs[1][n].set_ylabel("Write latency (μs)")
 
     for n in range(3):
         axs[0][n].set_ylim(min(min_read, min_write),max_read + 10000000)
         axs[1][n].set_ylim(min(min_read, min_write),max_write + 10000000)
-
+    fig.legend(handles=foo)
     fig.savefig(f"{sys.argv[1]}/filesystem_comp.svg")
 
 
@@ -272,15 +250,15 @@ def main():
     if len(sys.argv) < 2:
         print(USAGE_HELP)
         sys.exit(2)
-    data = []
-    with open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r', encoding="UTF-8") as metrics:
-        data = util.read_jsonl(metrics)
+    # data = []
+    # with open(f"{sys.argv[1]}/betree-metrics.jsonl", 'r', encoding="UTF-8") as metrics:
+    #     data = util.read_jsonl(metrics)
 
-    # Plot actions
-    metrics_plots.plot_throughput(data)
-    plot_tier_usage(data)
+    # # Plot actions
+    # metrics_plots.plot_throughput(data,sys.argv[1])
+    # plot_tier_usage(data)
     #plot_latency(data)
-    plot_object_distribution()
+    #plot_object_distribution()
     plot_filesystem_test()
 
 if __name__ == "__main__":

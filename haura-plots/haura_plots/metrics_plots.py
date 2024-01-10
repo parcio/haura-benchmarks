@@ -42,12 +42,12 @@ def plot_throughput(data, path):
             axs[tier_id].set_xlabel("runtime (minute:seconds)")
             axs[tier_id].set_xticks(epoch, epoch_formatted)
             axs[tier_id].locator_params(tight=True, nbins=10)
-            axs[tier_id].set_ylabel(f"{util.num_to_name(x)}\nMiB/s (I/0)")
+            axs[tier_id].set_ylabel(f"{util.num_to_name(tier_id)}\nMiB/s (I/0)")
             label=' | '.join(path.split('/')[-2:])
     fig.legend(loc="center right",handles=axs[0].get_lines())
     # Epoch in seconds
     fig.suptitle(f"Haura - {label}", y=0.98)  # add title
-    fig.savefig(f"{path[1]}/plot_write.svg")
+    fig.savefig(f"{path}/plot_write.svg")
     for tier_id in range(num_tiers):
         lines = axs[tier_id].get_lines()
         if len(lines) > 0:
@@ -56,4 +56,4 @@ def plot_throughput(data, path):
             lines[1].set_linestyle('dotted')
             lines[1].zorder = 2.0
     fig.legend(loc="center right",handles=axs[0].get_lines())
-    fig.savefig(f"{path[1]}/plot_read.svg")
+    fig.savefig(f"{path}/plot_read.svg")
