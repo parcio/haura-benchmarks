@@ -1,11 +1,11 @@
 #!/bin/env python
 import json
 import sys
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.cm as cm
 import matplotlib.colors as mat_col
 import matplotlib
@@ -13,50 +13,21 @@ import matplotlib
 from . import util
 from . import metrics_plots
 
-# def plot_latency(data):
-#     epoch = [temp['epoch_ms'] for temp in data]
-#     util.subtract_first_index(epoch)
-#     fig, ax = plt.subplots(figsize=(15,5))
-#     for x in range(4):
-#         for y in range(4):
-#             lat = np.array([])
-#             for temp in data:
-#                 if x >= len(temp['storage']['tiers']) or y >= len(temp['storage']['tiers'][x]['vdevs']):
-#                     continue
-#
-#                 lat = np.append(lat, temp['storage']['tiers'][x]['vdevs'][y]['read_latency'])
-#
-#             if len(lat) > 0:
-#                 lat = lat / 100000
-#                 lat.astype(int)
-#                 lat = np.array([np.nan if elem == 0 else elem for elem in lat])
-#
-#
-#                 ax.plot(epoch, lat, label = "Average Latency {}/{}".format(x,y))
-#     fig.legend()
-#     # Epoch in seconds
-#     ms_to_string = lambda time: f"{int(time / 1000 / 60)}:{int(time / 1000) % 60:02d}"
-#     epoch_formatted = list(map(ms_to_string, epoch))
-#     ax.set_xlabel("runtime (minute:seconds)")  # add X-axis label
-#     ax.set_xticks(epoch, epoch_formatted)
-#     ax.locator_params(tight=True, nbins=10)
-#     ax.set_ylabel("Read Latency in ms")  # add Y-axis label
-#     label=' | '.join(sys.argv[1].split('/')[-2:])
-#     ax.set_title(f"Haura - {label}")  # add title
-#     fig.savefig(f"{sys.argv[1]}/plot_latency.svg")
-
 def sort_by_o_id(key):
     """
     Access string subslice and first tuple member
     """
     return int(key[0][2:])
 
-def plot_object_distribution():
+def plot_object_distribution(path):
     """
     Plot colorcoded grids to show object distribution
     """
     data = []
-    with open(f"{sys.argv[1]}/tier_state.jsonl", 'r', encoding='UTF-8') as state_file:
+    if not os.path.exists(f"{path}/tier_state.jsonl"):
+        return
+
+    with open(f"{path}/tier_state.jsonl", 'r', encoding='UTF-8') as state_file:
         data = util.read_jsonl(state_file)
     colors = {
         0: util.WHITE,
@@ -141,7 +112,7 @@ def plot_object_distribution():
             #axs[3].set_ylim(0, 100)
             axs[3].set_xticks(x_ticks, labels=["Fastest", "Fast", "Slow"])
 
-        fig.savefig(f"{sys.argv[1]}/plot_timestep_{num_ts:0>3}.png")
+        fig.savefig(f"{path}/plot_timestep_{num_ts:0>3}.png")
         matplotlib.pyplot.close(fig)
         num_ts += 1
 
@@ -155,9 +126,9 @@ def plot_object_distribution():
     ax.set_title("Mean tier of all object groups over time")
     ax.set_ylim((1,3))
     pls_no_cut_off = ax.legend(bbox_to_anchor=(1.0,1.0), loc="upper left")
-    fig.savefig(f"{sys.argv[1]}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
+    fig.savefig(f"{path}/plot_timestep_means.svg", bbox_extra_artists=(pls_no_cut_off,), bbox_inches='tight')
 
-def plot_tier_usage(data):
+def plot_tier_usage(data, path):
     """
     Plot the utilized space of each storage tier.
     """
@@ -183,7 +154,7 @@ def plot_tier_usage(data):
         tier += 1
 
     fig.legend(loc='center right',handles=axs[0].get_lines())
-    fig.savefig(f"{sys.argv[1]}/tier_usage.svg")
+    fig.savefig(f"{path}/tier_usage.svg")
 
 # TODO: Adjust bucket sizes
 def size_buckets(byte):
@@ -261,6 +232,23 @@ def plot_filesystem_test():
     fig.savefig(f"{sys.argv[1]}/filesystem_comp.svg")
 
 
+def plot_evaluation_latency(path, variant):
+    if not os.path.exists(f"{path}/evaluation_{variant}.csv"):
+        return
+
+    data = pd.read_csv(f"{path}/evaluation_{variant}.csv");
+
+    fig, ax = plt.subplots(1,1,figsize=(6,4))
+    ax.scatter(data['size'][:5000], data['latency_ns'][:5000], marker='x')
+    xticks = np.arange(0, 12 * 1024 * 1024 + 1, 2 * 1024 * 1024)
+    ax.set_xticks(xticks, [int(x / 1024) for x in xticks])
+    ax.set_xlabel("Size in KiB")
+    ax.set_ylabel("Latency in ns")
+    ax.set_yscale("log")
+    label=' | '.join(path.split('/')[-2:])
+    ax.set_title(f"Haura - {label}")
+    fig.savefig(f"{path}/evaluation_read.svg")
+
 USAGE_HELP="""Please specify an input run directory. If you already completed \
 benchmarks they can be found under `results/*`.
 
@@ -278,9 +266,10 @@ def main():
 
     # Plot actions
     metrics_plots.plot_throughput(data, sys.argv[1])
-    plot_tier_usage(data)
-    #plot_latency(data)
-    #plot_object_distribution()
+    plot_tier_usage(data, sys.argv[1])
+    plot_evaluation_latency(sys.argv[1], "read")
+    plot_evaluation_latency(sys.argv[1], "rw")
+    plot_object_distribution(sys.argv[1])
     #plot_filesystem_test()
 
 if __name__ == "__main__":
