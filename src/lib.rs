@@ -21,9 +21,9 @@ use rand_xoshiro::Xoshiro256Plus;
 
 pub mod bufreader;
 
-pub type Database = database::Database<DatabaseConfiguration>;
-pub type Dataset = database::Dataset<DatabaseConfiguration>;
-pub type ObjectStore = object::ObjectStore<DatabaseConfiguration>;
+pub type Database = database::Database;
+pub type Dataset = database::Dataset;
+pub type ObjectStore = object::ObjectStore;
 
 pub struct Control {
     pub database: Arc<RwLock<Database>>,
@@ -56,11 +56,9 @@ impl Control {
 
         log::info!("using {:?}", cfg);
 
-        let database = Database::build(cfg).expect("Failed to open database");
+        let database = Database::build_threaded(cfg).expect("Failed to open database");
 
-        Control {
-            database: Arc::new(RwLock::new(database)),
-        }
+        Control { database }
     }
 
     pub fn new() -> Self {
@@ -143,7 +141,6 @@ pub fn with_random_bytes<E>(
     mut callback: impl FnMut(&[u8]) -> Result<(), E>,
 ) -> Result<(), E> {
     let mut buf = vec![0; buf_size];
-
     while n_bytes > 0 {
         rng.fill(&mut buf[..]);
         if let Err(e) = callback(&buf[..buf_size.min(n_bytes as usize)]) {

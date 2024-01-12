@@ -1,169 +1,234 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2030,SC2031 # we exploit this characteristic to start several test scenarios - merging them would lead to pollution
+
+function ensure_zip {
+  local url
+  url="https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.58.tar.xz"
+
+  if [ ! -e "$ZIP_ARCHIVE" ]
+  then
+    mkdir data
+    pushd data || exit
+
+    curl "$url" -o linux.tar.xz
+    tar xf linux.tar.xz
+    rm linux.tar.xz
+    zip -0 -r linux.zip linux-*
+    rm -r linux-*
+
+    popd || exit
+  fi
+}
+
+function ensure_bectl {
+  pushd ../../bectl || exit
+  cargo build --release
+  popd || return
+}
+
+function ensure_config {
+  if [ ! -e "$BETREE_CONFIG" ]
+  then
+    echo "No Haura configuration found at: ${BETREE_CONFIG}"
+    exit 1
+  fi
+}
 
 function run {
-  local name="$1"
-  local mode="$2"
-  shift 2
+  local vdev_type="$1"
+  local name="$2"
+  local mode="$3"
+  shift 3
 
-  local out_path="results/$(date -I)/${name}_$(date +%s)"
+  local out_path
+  out_path="results/$(date -I)_${vdev_type}/${name}_$(date +%s)"
   mkdir -p "$out_path"
 
-  pushd "$out_path"
-
-  echo "wiping ssd"
-  blkdiscard /dev/disk/by-id/nvme-CT500P5SSD8_20512BF90C84
-
-  sleep 10
+  pushd "$out_path" || return
 
   echo "running $mode with these settings:"
   env | grep BETREE__
   env > "env"
-  bectl config print-active > "config"
-  betree-perf "$mode" "$@"
+  "$ROOT/../../target/release/bectl" config print-active > "config"
+  "$ROOT/target/release/betree-perf" "$mode" "$@"
 
   echo "merging results into $out_path/out.jsonl"
-  json-merge \
+  "$ROOT/target/release/json-merge" \
     --timestamp-key epoch_ms \
     ./betree-metrics.jsonl \
     ./proc.jsonl \
     ./sysinfo.jsonl \
-    | json-flatten > "out.jsonl"
+    | "$ROOT/target/release/json-flatten" > "out.jsonl"
 
-  popd
+  popd || return
 
   sleep 60
 }
 
-cargo build --release
-
-export RUST_LOG=warn
-export BETREE_CONFIG="$PWD/perf-config.json"
-
 function tiered() {
   (
     export BETREE__ALLOC_STRATEGY='[[0],[0],[],[]]'
-    run tiered1_all0_alloc tiered
+    run "$VDEV_TYPE" tiered1_all0_alloc tiered1
   )
 
   (
     export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
-    run tiered1_id_alloc tiered
+    run "$VDEV_TYPE" tiered1_id_alloc tiered1
   )
 
   (
     export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
-    run tiered1_all1_alloc tiered
+    run "$VDEV_TYPE" tiered1_all1_alloc tiered1
   )
 }
 
+function scientific_evaluation() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
+  run "$VDEV_TYPE" scientific_evaluation_id_alloc evaluation-read 30
+}
+
+function evaluation_rw() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
+  run "$VDEV_TYPE" file_system_three evaluation-rw
+}
+
+function filesystem_zip() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[2],[]]'
+  run "$VDEV_TYPE" file_system_three "$ZIP_ARCHIVE"
+}
+
+function checkpoints() {
+  export BETREE__ALLOC_STRATEGY='[[0, 1],[1],[],[]]'
+  run "$VDEV_TYPE" checkpoints_fastest checkpoints
+}
+
+function filesystem() {
+  export BETREE__ALLOC_STRATEGY='[[0],[1],[2],[]]'
+  run "$VDEV_TYPE" file_system_three filesystem
+}
+
 function zip_cache() {
-  local F="$PWD/data/linux-5.12.13.zip"
   local F_CD_START=1040032667
+
   for cache_mib in 32 64 128 256 512 1024 2048 4096 8192; do
     (
-      export BETREE__CACHE_SIZE=$(($cache_mib * 1024 * 1024))
-      run "zip_cache_$cache_mb" zip 4 100 10 "$F" "$F_CD_START"
+      export BETREE__CACHE_SIZE=$((cache_mib * 1024 * 1024))
+      run "$VDEV_TYPE" "zip_cache_$cache_mib" zip 4 100 10 "$ZIP_ARCHIVE" "$F_CD_START"
     )
   done
 }
 
 function zip_mt() {
-  local F="$PWD/data/linux-5.12.13.zip"
+  local F="$PWD/data/linux.zip"
   local F_CD_START=1040032667
+
   for cache_mib in 256 512 1024 2048; do
     echo "using $cache_mib MiB of cache"
     (
-      export BETREE__CACHE_SIZE=$(($cache_mib * 1024 * 1024))
+      export BETREE__CACHE_SIZE=$((cache_mib * 1024 * 1024))
 
       local total=10000
 
       for num_workers in 1 2 3 4 5 6 7 8 9 10; do
         echo "running with $num_workers workers"
-        local per_worker=$(($total / $num_workers))
-        local per_run=$(($per_worker / 10))
+        local per_worker=$((total / num_workers))
+        local per_run=$((per_worker / 10))
 
-        run "zip_mt_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
+        run "$VDEV_TYPE" "zip_mt_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
       done
     )
   done
 }
 
 function zip_tiered() {
-  local F="$PWD/data/linux-5.12.13.zip"
-  local F_CD_START=1040032667
+  local F_CD_START=1 #242415017 #1040032667
   # for cache_mib in 256 512 1024; do
   for cache_mib in 32 64; do
     echo "using $cache_mib MiB of cache"
     (
-      export BETREE__CACHE_SIZE=$(($cache_mib * 1024 * 1024))
+      export BETREE__CACHE_SIZE=$((cache_mib * 1024 * 1024))
 
       local total=10000
 
+      export BETREE__STORAGE__TIERS="[ [ { mem = $((1 * 1024 * 1024 * 1024)) } ], [ { mem = $((1 * 1024 * 1024 * 1024)) } ] ]"
+
       for num_workers in 1 2 3 4 5 6 7 8 9 10; do
         echo "running with $num_workers workers"
-        local per_worker=$(($total / $num_workers))
-        local per_run=$(($per_worker / 10))
+        local per_worker=$((total / num_workers))
+        local per_run=$((per_worker / 10))
 
         (
           export BETREE__ALLOC_STRATEGY='[[0],[0],[],[]]'
-          run "zip_tiered_all0_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
+          run "$VDEV_TYPE" "zip_tiered_all0_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$ZIP_ARCHIVE" "$F_CD_START"
         )
 
         (
           export BETREE__ALLOC_STRATEGY='[[0],[1],[],[]]'
-          run "zip_tiered_id_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
+          run "$VDEV_TYPE" "zip_tiered_id_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$ZIP_ARCHIVE" "$F_CD_START"
         )
 
         (
           export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
-          run "zip_tiered_all1_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
+          run "$VDEV_TYPE" "zip_tiered_all1_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$ZIP_ARCHIVE" "$F_CD_START"
         )
 
-        (
-          export BETREE__STORAGE__TIERS="[ [ { mem = $((4 * 1024 * 1024 * 1024)) } ] ]"
-          export BETREE__ALLOC_STRATEGY="[[0], [0], [], []]"
-          run "zip_tiered_mem_${cache_mib}_${num_workers}_${per_run}_10" zip "$num_workers" "$per_run" 10 "$F" "$F_CD_START"
-        )
       done
     )
   done
 }
 
-
-
 function ingest() {
-  local F="$PWD/data/linux-5.12.13.zip"
-  local DISK=/dev/disk/by-id/ata-WDC_WD30EFRX-68EUZN0_WD-WMC4N2195306
-
   (
-    export BETREE__STORAGE__TIERS="[ [ { file = \"$DISK\" } ] ]"
-    export BETREE__DEFAULT_STORAGE_CLASS=0
-
     (
       export BETREE__COMPRESSION="None"
-      run ingest_hdd_none ingest "$F"
+      run "default" ingest_hdd_none ingest "$ZIP_ARCHIVE"
     )
 
     for level in $(seq 1 16); do
       (
         export BETREE__COMPRESSION="{ Zstd = { level = $level } }"
-        run "ingest_hdd_zstd_$level" ingest "$F"
+        run "$VDEV_TYPE" "ingest_hdd_zstd_$level" ingest "$ZIP_ARCHIVE"
       )
     done
   )
 }
 
 function switchover() {
-  run switchover_tiny switchover 32 "$((32 * 1024 * 1024))"
-  run switchover_small switchover 8 "$((128 * 1024 * 1024))"
-  run switchover_medium switchover 4 "$((2 * 1024 * 1024 * 1024))"
-  run switchover_large switchover 4 "$((8 * 1024 * 1024 * 1024))"
+  run "$VDEV_TYPE" switchover_tiny switchover 32 "$((32 * 1024 * 1024))"
+  run "$VDEV_TYPE" switchover_small switchover 8 "$((128 * 1024 * 1024))"
+  run "$VDEV_TYPE" switchover_medium switchover 4 "$((2 * 1024 * 1024 * 1024))"
+  run "$VDEV_TYPE" switchover_large switchover 4 "$((8 * 1024 * 1024 * 1024))"
 }
 
-zip_tiered
-#(
-  # export BETREE__ALLOC_STRATEGY='[[1],[1],[],[]]'
-  #export RUST_LOG=info
-  #export BETREE__CACHE_SIZE=8589934592
-  #run rewrite1 rewrite $((500 * 1024 * 1024)) 4
-#)
+cargo build --release
+
+if [ -z "$BETREE_CONFIG" ]
+then
+  export BETREE_CONFIG="$PWD/perf-config.json"
+fi
+
+export ROOT="$PWD"
+export ZIP_ARCHIVE="$PWD/data/linux.zip"
+# Category under which the default runs should be made, a function may modify
+# this if multiple categories are needed.
+export VDEV_TYPE="default"
+
+ensure_bectl
+ensure_zip
+ensure_config
+
+# Uncomment the scenarios which you want to run.  Assure that the used
+# configuration is valid for the scenario as some of them require a minimum
+# amount of tiers.
+
+#zip_cache
+#zip_tiered
+#zip_mt
+#tiered
+#scientific_evaluation
+#evaluation_rw
+#filesystem
+#filesystem_zip
+#checkpoints
+#switchover
+#ingest
